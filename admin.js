@@ -388,10 +388,18 @@ function formatLogTime(timestamp) {
 }
 
 // Update loadUserPageVisits function
+let pageVisitsUnsubscribe = null;
+
 async function loadUserPageVisits(userId, date) {
     const visitsLog = document.getElementById('visitsLog');
     const totalTimeToday = document.getElementById('totalTimeToday');
     const pageOpens = document.getElementById('pageOpens');
+
+    // Cleanup previous listener
+    if (pageVisitsUnsubscribe) {
+        pageVisitsUnsubscribe();
+        pageVisitsUnsubscribe = null;
+    }
 
     if (!userId || !date) {
         visitsLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
@@ -406,73 +414,92 @@ async function loadUserPageVisits(userId, date) {
             orderBy('timestamp', 'asc')
         );
 
-        const snapshot = await getDocs(q);
-        let visits = [];
-        let totalDuration = 0;
-        let openCount = 0;
-        let openTime = null;
+        // Use onSnapshot instead of getDocs for real-time updates
+        pageVisitsUnsubscribe = onSnapshot(q, (snapshot) => {
+            let visits = [];
+            let totalDuration = 0;
+            let openCount = 0;
+            let openTime = null;
 
-        // Process events in chronological order
-        snapshot.docs.forEach(doc => {
-            const event = doc.data();
-            if (event.action === 'opened') {
-                openTime = event.timestamp;
-            } else if (event.action === 'closed' && openTime) {
-                const duration = event.timestamp.toMillis() - openTime.toMillis();
-                if (duration > 0) {
-                    visits.push({
-                        openTime: openTime,
-                        closeTime: event.timestamp,
-                        duration: duration
-                    });
-                    totalDuration += duration;
-                    openCount++;
+            // Process events in chronological order
+            snapshot.docs.forEach(doc => {
+                const event = doc.data();
+                if (event.action === 'opened') {
+                    openTime = event.timestamp;
+                } else if (event.action === 'closed' && openTime) {
+                    const duration = event.timestamp.toMillis() - openTime.toMillis();
+                    if (duration > 0) {
+                        visits.push({
+                            openTime: openTime,
+                            closeTime: event.timestamp,
+                            duration: duration
+                        });
+                        totalDuration += duration;
+                        openCount++;
+                    }
+                    openTime = null;
                 }
-                openTime = null;
+            });
+
+            // Sort visits by open time in descending order (most recent first)
+            visits.sort((a, b) => b.openTime.toMillis() - a.openTime.toMillis());
+
+            // Generate HTML for all visits with visibility classes
+            const html = visits.map((visit, index) => `
+                <tr class="${index < 5 ? 'visible' : 'hidden'}">
+                    <td>${formatLogTime(visit.openTime)}</td>
+                    <td>${formatLogTime(visit.closeTime)}</td>
+                    <td>${formatDuration(visit.duration)}</td>
+                </tr>
+            `).join('');
+
+            visitsLog.innerHTML = html || '<tr><td colspan="3">No visits recorded for this date</td></tr>';
+            totalTimeToday.textContent = formatDuration(totalDuration);
+            pageOpens.textContent = openCount;
+
+            // Add scroll listener for lazy loading
+            const tableContainer = visitsLog.closest('.log-table-container');
+            if (visits.length > 5) {
+                tableContainer.onscroll = () => {
+                    if (tableContainer.scrollTop + tableContainer.clientHeight >= tableContainer.scrollHeight - 20) {
+                        const hiddenRows = visitsLog.querySelectorAll('tr.hidden');
+                        hiddenRows.forEach((row, index) => {
+                            if (index < 5) row.classList.replace('hidden', 'visible');
+                        });
+                    }
+                };
             }
+        }, (error) => {
+            console.error('Error loading visits:', error);
+            visitsLog.innerHTML = '<tr><td colspan="3">Error loading data</td></tr>';
         });
 
-        // Sort visits by open time in descending order
-        visits.sort((a, b) => b.openTime.toMillis() - a.openTime.toMillis());
-
-        // Generate HTML for all visits with visibility classes
-        const html = visits.map((visit, index) => `
-            <tr class="${index < 5 ? 'visible' : 'hidden'}">
-                <td>${formatLogTime(visit.openTime)}</td>
-                <td>${formatLogTime(visit.closeTime)}</td>
-                <td>${formatDuration(visit.duration)}</td>
-            </tr>
-        `).join('');
-
-        visitsLog.innerHTML = html || '<tr><td colspan="3">No visits recorded for this date</td></tr>';
-        totalTimeToday.textContent = formatDuration(totalDuration);
-        pageOpens.textContent = openCount;
-
-        // Add scroll listener for lazy loading
-        const tableContainer = visitsLog.closest('.log-table-container');
-        if (visits.length > 5) {
-            tableContainer.onscroll = () => {
-                if (tableContainer.scrollTop + tableContainer.clientHeight >= tableContainer.scrollHeight - 20) {
-                    const hiddenRows = visitsLog.querySelectorAll('tr.hidden');
-                    hiddenRows.forEach((row, index) => {
-                        if (index < 5) {
-                            row.classList.replace('hidden', 'visible');
-                        }
-                    });
-                }
-            };
-        }
-
     } catch (error) {
-        console.error('Error loading visits:', error);
+        console.error('Error setting up visits listener:', error);
         visitsLog.innerHTML = '<tr><td colspan="3">Error loading data</td></tr>';
     }
 }
+
+// Update the cleanup when changing date or user
+document.getElementById('activityDate').addEventListener('change', (e) => {
+    if (pageVisitsUnsubscribe) {
+        pageVisitsUnsubscribe();
+        pageVisitsUnsubscribe = null;
+    }
+    if (progressUser.value) {
+        loadUserPageVisits(progressUser.value, e.target.value);
+        loadUserActivities(progressUser.value, e.target.value);
+    }
+});
 
 // Update setupProgressListener function
 function setupProgressListener() {
     if (progressUnsubscribe) {
         progressUnsubscribe();
+    }
+    if (pageVisitsUnsubscribe) {
+        pageVisitsUnsubscribe();
+        pageVisitsUnsubscribe = null;
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -629,6 +656,10 @@ async function loadUserActivities(userId, date) {
 
 // Add date change handler
 document.getElementById('activityDate').addEventListener('change', (e) => {
+    if (pageVisitsUnsubscribe) {
+        pageVisitsUnsubscribe();
+        pageVisitsUnsubscribe = null;
+    }
     if (progressUser.value) {
         const selectedDate = e.target.value;
         loadUserPageVisits(progressUser.value, selectedDate);
