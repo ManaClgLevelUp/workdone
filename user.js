@@ -73,6 +73,21 @@ function debounce(func, wait) {
     };
 }
 
+// Add helper function for phone formatting
+function formatPhoneNumber(phone) {
+    // Remove any non-digit characters
+    let cleaned = phone.replace(/\D/g, '');
+    // Add +91 if not present and number is 10 digits
+    if (cleaned.length === 10) {
+        return `+91${cleaned}`;
+    }
+    // If number already has country code
+    if (cleaned.length === 12 && cleaned.startsWith('91')) {
+        return `+${cleaned}`;
+    }
+    return phone; // Return original if format is unknown
+}
+
 // Load Contacts
 async function loadContacts(workType) {
     if (!currentUser) return;
@@ -90,11 +105,12 @@ async function loadContacts(workType) {
     onSnapshot(q, (snapshot) => {
         const html = snapshot.docs.map(doc => {
             const data = doc.data();
+            const formattedPhone = formatPhoneNumber(data.phone);
             return `
                 <div class="contact-card">
                     <div class="contact-info">
                         <div class="contact-name">${data.name}</div>
-                        <div class="contact-phone">${data.phone}</div>
+                        <div class="contact-phone">${formattedPhone}</div>
                     </div>
                     
                     <div class="contact-actions">
@@ -134,7 +150,8 @@ async function loadContacts(workType) {
 
 // Make functions available to window object for inline event handlers
 window.makeCall = async (contactId, phone) => {
-    window.location.href = `tel:${phone}`;
+    const formattedPhone = formatPhoneNumber(phone);
+    window.location.href = `tel:${formattedPhone}`;
     await updateContactStatus(contactId, {
         callTime: serverTimestamp(),
         lastUpdated: serverTimestamp()
@@ -142,7 +159,10 @@ window.makeCall = async (contactId, phone) => {
 };
 
 window.sendWhatsApp = async (contactId, phone) => {
-    window.open(`https://wa.me/${phone}`, '_blank');
+    const formattedPhone = formatPhoneNumber(phone);
+    // Remove '+' for WhatsApp URL
+    const whatsappNumber = formattedPhone.startsWith('+') ? formattedPhone.substring(1) : formattedPhone;
+    window.open(`https://wa.me/${whatsappNumber}`, '_blank');
     await updateContactStatus(contactId, {
         whatsappTime: serverTimestamp(),
         lastUpdated: serverTimestamp()

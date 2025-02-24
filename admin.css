@@ -204,6 +204,13 @@ th {
 .contact-phone {
     font-size: 0.85em;
     color: #666;
+    font-family: monospace; /* Better readability for numbers */
+    letter-spacing: 0.5px;
+}
+
+.inline-edit[type="tel"] {
+    font-family: monospace;
+    letter-spacing: 0.5px;
 }
 
 .action-buttons {

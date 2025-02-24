@@ -249,6 +249,21 @@ window.deleteUser = async (userId) => {
     }
 };
 
+// Helper function to format phone number
+function formatPhoneNumber(phone) {
+    // Remove any non-digit characters
+    let cleaned = phone.replace(/\D/g, '');
+    // Add +91 if not present and number is 10 digits
+    if (cleaned.length === 10) {
+        return `+91${cleaned}`;
+    }
+    // If number already has country code
+    if (cleaned.length === 12 && cleaned.startsWith('91')) {
+        return `+${cleaned}`;
+    }
+    return phone; // Return original if format is unknown
+}
+
 // Work Assignment Handlers
 addSingleContact.addEventListener('click', async () => {
     if (!selectUser.value || !contactName.value || !contactPhone.value) {
@@ -259,7 +274,7 @@ addSingleContact.addEventListener('click', async () => {
     try {
         await addDoc(collection(db, 'contacts'), {
             name: contactName.value,
-            phone: contactPhone.value,
+            phone: formatPhoneNumber(contactPhone.value),
             assignedTo: selectUser.value,
             workType: workType.value,
             status: 'notCalled',
@@ -295,7 +310,7 @@ addBulkContacts.addEventListener('click', async () => {
             const newDocRef = doc(collection(db, 'contacts'));
             batch.set(newDocRef, {
                 name,
-                phone,
+                phone: formatPhoneNumber(phone),
                 assignedTo: selectUser.value,
                 workType: workType.value,
                 status: 'notCalled',
@@ -318,7 +333,7 @@ progressUser.addEventListener('change', setupProgressListener);
 progressWorkType.addEventListener('change', setupProgressListener);
 
 window.adminMakeCall = async (contactId, phone) => {
-    window.location.href = `tel:${phone}`;
+    window.location.href = `tel:+${phone}`;
     await updateDoc(doc(db, 'contacts', contactId), {
         adminCallTime: serverTimestamp(),
         lastUpdated: serverTimestamp()
@@ -326,7 +341,8 @@ window.adminMakeCall = async (contactId, phone) => {
 };
 
 window.adminSendWhatsApp = async (contactId, phone) => {
-    window.open(`https://wa.me/${phone}`, '_blank');
+    const formattedPhone = phone.startsWith('+') ? phone.substring(1) : phone;
+    window.open(`https://wa.me/${formattedPhone}`, '_blank');
     await updateDoc(doc(db, 'contacts', contactId), {
         adminWhatsappTime: serverTimestamp(),
         lastUpdated: serverTimestamp()
@@ -523,7 +539,7 @@ window.saveContactChanges = async (contactId) => {
     try {
         await updateDoc(doc(db, 'contacts', contactId), {
             name: nameInput.value,
-            phone: phoneInput.value,
+            phone: formatPhoneNumber(phoneInput.value),
             status: statusSelect.value,
             notes: notesArea.value,
             lastUpdated: serverTimestamp()
@@ -531,7 +547,7 @@ window.saveContactChanges = async (contactId) => {
 
         // Update display values
         row.querySelector('.contact-name').textContent = nameInput.value;
-        row.querySelector('.contact-phone').textContent = phoneInput.value;
+        row.querySelector('.contact-phone').textContent = formatPhoneNumber(phoneInput.value);
         
         // Exit edit mode
         window.toggleContactEdit(contactId);
