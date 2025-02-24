@@ -121,9 +121,13 @@
                 </div>
 
                 <div id="userActivityInfo" class="user-activity-info">
-                    <div class="activity-logs">
-                        <div class="activity-section">
-                            <h3>Activity Summary</h3>
+                    <div class="view-toggle">
+                        <button class="toggle-btn active" data-view="summary">Active Summary</button>
+                        <button class="toggle-btn" data-view="visits">Page Visit Log</button>
+                    </div>
+
+                    <div class="view-sections">
+                        <div id="activitySummary" class="view-section active">
                             <div class="log-table-container">
                                 <table class="log-table">
                                     <thead>
@@ -138,14 +142,13 @@
                             </div>
                         </div>
 
-                        <div class="activity-section">
-                            <h3>Page Visit Log</h3>
+                        <div id="pageVisitLog" class="view-section">
                             <div class="log-table-container">
                                 <table class="log-table">
                                     <thead>
                                         <tr>
-                                            <th>Time</th>
-                                            <th>Action</th>
+                                            <th>Opened Time</th>
+                                            <th>Closed Time</th>
                                             <th>Duration</th>
                                         </tr>
                                     </thead>
@@ -154,16 +157,16 @@
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="activity-stats">
-                        <div class="stat-item">
-                            <label>Total Active Time:</label>
-                            <span id="totalTimeToday">-</span>
-                        </div>
-                        <div class="stat-item">
-                            <label>Page Opens:</label>
-                            <span id="pageOpens">-</span>
-                        </div>
+                <div class="activity-stats">
+                    <div class="stat-item">
+                        <label>Total Active Time:</label>
+                        <span id="totalTimeToday">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>Page Opens:</label>
+                        <span id="pageOpens">-</span>
                     </div>
                 </div>
 

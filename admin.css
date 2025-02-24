@@ -696,3 +696,47 @@ th {
     background-color: #ffebee;
     color: #d32f2f;
 }
+
+/* Toggle and Table Styles */
+.view-toggle {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.toggle-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #4CAF50;
+    background: transparent;
+    color: #4CAF50;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.toggle-btn.active {
+    background: #4CAF50;
+    color: white;
+}
+
+.view-section {
+    display: none;
+}
+
+.view-section.active {
+    display: block;
+}
+
+.log-table tr.hidden {
+    display: none;
+}
+
+.log-table tr.visible {
+    display: table-row;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}

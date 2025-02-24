@@ -78,6 +78,22 @@ const totalDuration = document.getElementById('totalDuration');
 const sessionCount = document.getElementById('sessionCount');
 const activityTimeline = document.getElementById('activityTimeline');
 
+// Add after DOM Elements
+const toggleBtns = document.querySelectorAll('.view-toggle .toggle-btn');
+const viewSections = document.querySelectorAll('.view-section');
+
+// Add toggle functionality
+toggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        toggleBtns.forEach(b => b.classList.remove('active'));
+        viewSections.forEach(s => s.classList.remove('active'));
+        
+        btn.classList.add('active');
+        const targetView = btn.dataset.view;
+        document.getElementById(targetView === 'summary' ? 'activitySummary' : 'pageVisitLog').classList.add('active');
+    });
+});
+
 // Auth state observer
 onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -387,46 +403,65 @@ async function loadUserPageVisits(userId, date) {
             collection(db, 'pageVisits'),
             where('userId', '==', userId),
             where('date', '==', date),
-            orderBy('timestamp', 'desc'),
-            limit(50)
+            orderBy('timestamp', 'asc')
         );
 
         const snapshot = await getDocs(q);
         let visits = [];
         let totalDuration = 0;
         let openCount = 0;
+        let openTime = null;
 
+        // Process events in chronological order
         snapshot.docs.forEach(doc => {
-            const visit = doc.data();
-            visits.push({
-                time: visit.timestamp,
-                action: visit.action,
-                duration: 0
-            });
+            const event = doc.data();
+            if (event.action === 'opened') {
+                openTime = event.timestamp;
+            } else if (event.action === 'closed' && openTime) {
+                const duration = event.timestamp.toMillis() - openTime.toMillis();
+                if (duration > 0) {
+                    visits.push({
+                        openTime: openTime,
+                        closeTime: event.timestamp,
+                        duration: duration
+                    });
+                    totalDuration += duration;
+                    openCount++;
+                }
+                openTime = null;
+            }
         });
 
-        // Calculate durations
-        for (let i = 0; i < visits.length - 1; i++) {
-            if (visits[i].action === 'closed' && visits[i + 1].action === 'opened') {
-                const duration = visits[i].time.toMillis() - visits[i + 1].time.toMillis();
-                visits[i].duration = duration;
-                totalDuration += duration;
-                openCount++;
-            }
-        }
+        // Sort visits by open time in descending order
+        visits.sort((a, b) => b.openTime.toMillis() - a.openTime.toMillis());
 
-        // Generate HTML for the first 5 rows
-        const html = visits.slice(0, 5).map(visit => `
-            <tr>
-                <td>${formatLogTime(visit.time)}</td>
-                <td><span class="action-badge ${visit.action}">${visit.action}</span></td>
-                <td>${visit.duration ? formatDuration(visit.duration) : '-'}</td>
+        // Generate HTML for all visits with visibility classes
+        const html = visits.map((visit, index) => `
+            <tr class="${index < 5 ? 'visible' : 'hidden'}">
+                <td>${formatLogTime(visit.openTime)}</td>
+                <td>${formatLogTime(visit.closeTime)}</td>
+                <td>${formatDuration(visit.duration)}</td>
             </tr>
         `).join('');
 
         visitsLog.innerHTML = html || '<tr><td colspan="3">No visits recorded for this date</td></tr>';
         totalTimeToday.textContent = formatDuration(totalDuration);
         pageOpens.textContent = openCount;
+
+        // Add scroll listener for lazy loading
+        const tableContainer = visitsLog.closest('.log-table-container');
+        if (visits.length > 5) {
+            tableContainer.onscroll = () => {
+                if (tableContainer.scrollTop + tableContainer.clientHeight >= tableContainer.scrollHeight - 20) {
+                    const hiddenRows = visitsLog.querySelectorAll('tr.hidden');
+                    hiddenRows.forEach((row, index) => {
+                        if (index < 5) {
+                            row.classList.replace('hidden', 'visible');
+                        }
+                    });
+                }
+            };
+        }
 
     } catch (error) {
         console.error('Error loading visits:', error);
