@@ -128,6 +128,31 @@ navBtns.forEach(btn => {
     });
 });
 
+// Add after initial DOM elements
+const themeToggle = document.getElementById('themeToggle');
+
+// Add theme toggle functionality
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+}
+
+function updateThemeIcon(theme) {
+    themeToggle.innerHTML = theme === 'dark' ? 
+        '<i class="fas fa-sun"></i>' : 
+        '<i class="fas fa-moon"></i>';
+}
+
+themeToggle.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+});
+
 // Auth state observer
 onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -138,6 +163,7 @@ onAuthStateChanged(auth, async (user) => {
             adminName.textContent = userDoc.data().name || 'Admin';
             loadUsers();
             loadExistingUsers(); // Add this line
+            initTheme(); // Initialize theme
         } else {
             window.location.href = 'index.html';
         }
@@ -412,7 +438,8 @@ window.adminSendWhatsApp = async (contactId, phone) => {
 // Add new function to format log time
 function formatLogTime(timestamp) {
     if (!timestamp) return '-';
-    const date = timestamp.toDate();
+    // Handle both Firestore Timestamp and regular Date objects
+    const date = timestamp instanceof Date ? timestamp : timestamp.toDate();
     return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
@@ -445,7 +472,7 @@ async function loadUserPageVisits(userId, date) {
             collection(db, 'pageVisits'),
             where('userId', '==', userId),
             where('date', '==', date),
-            orderBy('timestamp', 'desc')
+            orderBy('serverTime', 'desc') // Use serverTime for ordering
         );
 
         pageVisitsUnsubscribe = onSnapshot(q, (snapshot) => {
@@ -460,6 +487,7 @@ async function loadUserPageVisits(userId, date) {
                 if (data.action === 'opened') {
                     openedVisits.set(doc.id, {
                         openTime: data.timestamp,
+                        serverTime: data.serverTime,
                         id: doc.id
                     });
                 }
@@ -471,12 +499,13 @@ async function loadUserPageVisits(userId, date) {
                 if (data.action === 'closed' && data.openedDocId) {
                     const openedVisit = openedVisits.get(data.openedDocId);
                     if (openedVisit) {
-                        const duration = data.timestamp.toMillis() - openedVisit.openTime.toMillis();
+                        const duration = calculateDuration(openedVisit.openTime, data.timestamp);
                         if (duration > 0) {
                             visits.push({
                                 openTime: openedVisit.openTime,
                                 closeTime: data.timestamp,
-                                duration: duration
+                                duration: duration,
+                                serverTime: data.serverTime // Keep for sorting
                             });
                             totalDuration += duration;
                             openCount++;
@@ -485,8 +514,8 @@ async function loadUserPageVisits(userId, date) {
                 }
             });
 
-            // Sort visits by most recent first
-            visits.sort((a, b) => b.openTime.toMillis() - a.openTime.toMillis());
+            // Sort visits by server timestamp for consistency
+            visits.sort((a, b) => b.serverTime.toMillis() - a.serverTime.toMillis());
 
             // Generate HTML with visibility classes
             const html = visits.map((visit, index) => `
@@ -886,4 +915,13 @@ function resetActivityDisplay() {
     totalDuration.textContent = '-';
     sessionCount.textContent = '-';
     activityTimeline.innerHTML = '';
+}
+
+// Update the timestamp calculation functions
+function calculateDuration(startTime, endTime) {
+    if (!startTime || !endTime) return 0;
+    // Handle both Firestore Timestamp and regular Date objects
+    const start = startTime instanceof Date ? startTime : startTime.toDate();
+    const end = endTime instanceof Date ? endTime : endTime.toDate();
+    return end.getTime() - start.getTime();
 }

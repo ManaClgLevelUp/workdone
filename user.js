@@ -41,14 +41,15 @@ async function logPageVisit(action) {
     if (!currentUserId) return;
     
     try {
-        // Get today's date in YYYY-MM-DD format
         const today = new Date().toISOString().split('T')[0];
-        
+        const currentTimestamp = new Date(); // Get current time
+
         if (action === 'opened') {
             const visitDoc = await addDoc(collection(db, 'pageVisits'), {
                 userId: currentUserId,
                 action: 'opened',
-                timestamp: serverTimestamp(),
+                timestamp: currentTimestamp, // Use actual Date object
+                serverTime: serverTimestamp(), // Keep server timestamp for consistency
                 date: today
             });
             lastVisitDoc = visitDoc;
@@ -56,7 +57,8 @@ async function logPageVisit(action) {
             await addDoc(collection(db, 'pageVisits'), {
                 userId: currentUserId,
                 action: 'closed',
-                timestamp: serverTimestamp(),
+                timestamp: currentTimestamp, // Use actual Date object
+                serverTime: serverTimestamp(), // Keep server timestamp for consistency
                 date: today,
                 openedDocId: lastVisitDoc.id
             });
