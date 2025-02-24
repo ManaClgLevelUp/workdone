@@ -338,7 +338,11 @@ function setupProgressListener() {
         progressUnsubscribe();
     }
 
-    if (!progressUser.value) return;
+    if (!progressUser.value) {
+        document.getElementById('userContactInfo').innerHTML = '';
+        progressData.innerHTML = '';
+        return;
+    }
 
     const q = query(collection(db, 'contacts'), 
         where('assignedTo', '==', progressUser.value),
@@ -349,7 +353,8 @@ function setupProgressListener() {
         const userDoc = await getDoc(doc(db, 'users', progressUser.value));
         const userData = userDoc.data();
         
-        const userContactHtml = `
+        // Update user contact info
+        document.getElementById('userContactInfo').innerHTML = `
             <div class="user-contact-row">
                 <div class="user-contact-info">
                     <div>
@@ -368,54 +373,173 @@ function setupProgressListener() {
             </div>
         `;
 
-        const tableHtml = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Contact Details</th>
-                        <th>Actions</th>
-                        <th>Status</th>
-                        <th>Notes</th>
-                        <th>Last Updated</th>
-                        <th>Manage</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${snapshot.docs.map(doc => {
-                        const data = doc.data();
-                        return `
-                            <tr>
-                                <td>
-                                    <div class="contact-name">${data.name}</div>
-                                    <div class="contact-phone">${data.phone}</div>
-                                </td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="action-btn call-btn" onclick="window.adminMakeCall('${doc.id}', '${data.phone}')">
-                                            <i class="fas fa-phone"></i>
-                                        </button>
-                                        <button class="action-btn whatsapp-btn" onclick="window.adminSendWhatsApp('${doc.id}', '${data.phone}')">
-                                            <i class="fab fa-whatsapp"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                                <td>${data.status || 'Not Called'}</td>
-                                <td>${data.notes || '-'}</td>
-                                <td>${data.lastUpdated ? new Date(data.lastUpdated.toDate()).toLocaleString() : '-'}</td>
-                                <td>
-                                    <button class="edit-btn" onclick="editContact('${doc.id}')">Edit</button>
-                                    <button class="delete-btn" onclick="deleteContact('${doc.id}')">Delete</button>
-                                </td>
-                            </tr>
-                        `;
-                    }).join('')}
-                </tbody>
-            </table>
-        `;
-        
-        progressData.innerHTML = userContactHtml + '<div class="progress-table">' + tableHtml + '</div>';
+        // Update contacts list with inline editing
+        progressData.innerHTML = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return `
+                <tr data-contactid="${doc.id}">
+                    <td>
+                        <div class="contact-details">
+                            <div class="contact-name">${data.name}</div>
+                            <div class="contact-phone">${data.phone}</div>
+                            <div class="contact-edit-form" style="display: none;">
+                                <input type="text" class="inline-edit name" value="${data.name}">
+                                <input type="tel" class="inline-edit phone" value="${data.phone}">
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn call-btn" onclick="window.adminMakeCall('${doc.id}', '${data.phone}')">
+                                <i class="fas fa-phone"></i>
+                            </button>
+                            <button class="action-btn whatsapp-btn" onclick="window.adminSendWhatsApp('${doc.id}', '${data.phone}')">
+                                <i class="fab fa-whatsapp"></i>
+                            </button>
+                        </div>
+                    </td>
+                    <td>
+                        <select class="status-select" disabled>
+                            <option value="notCalled" ${data.status === 'notCalled' ? 'selected' : ''}>Not Called</option>
+                            <option value="answered" ${data.status === 'answered' ? 'selected' : ''}>Answered</option>
+                            <option value="notAnswered" ${data.status === 'notAnswered' ? 'selected' : ''}>Not Answered</option>
+                            <option value="notInterested" ${data.status === 'notInterested' ? 'selected' : ''}>Not Interested</option>
+                        </select>
+                    </td>
+                    <td>
+                        <textarea class="notes-textarea" readonly
+                                placeholder="Add notes...">${data.notes || ''}</textarea>
+                    </td>
+                    <td>${data.lastUpdated ? new Date(data.lastUpdated.toDate()).toLocaleString() : '-'}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn edit-btn" onclick="window.toggleContactEdit('${doc.id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn save-btn" onclick="window.saveContactChanges('${doc.id}')" style="display: none;">
+                                <i class="fas fa-save"></i>
+                            </button>
+                            <button class="action-btn delete-btn" onclick="window.deleteContact('${doc.id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     });
 }
+
+// Add new contact management functions to window object
+window.updateContactStatus = async (contactId, status) => {
+    try {
+        await updateDoc(doc(db, 'contacts', contactId), {
+            status: status,
+            lastUpdated: serverTimestamp()
+        });
+    } catch (error) {
+        alert('Error updating status: ' + error.message);
+    }
+};
+
+window.updateContactNotes = async (contactId, notes) => {
+    try {
+        await updateDoc(doc(db, 'contacts', contactId), {
+            notes: notes,
+            lastUpdated: serverTimestamp()
+        });
+    } catch (error) {
+        alert('Error updating notes: ' + error.message);
+    }
+};
+
+window.editContactInline = async (contactId) => {
+    const row = document.querySelector(`tr[data-contactid="${contactId}"]`);
+    const nameDiv = row.querySelector('.contact-name');
+    const phoneDiv = row.querySelector('.contact-phone');
+    
+    const currentName = nameDiv.textContent;
+    const currentPhone = phoneDiv.textContent;
+    
+    nameDiv.innerHTML = `<input type="text" class="inline-edit" value="${currentName}">`;
+    phoneDiv.innerHTML = `<input type="tel" class="inline-edit" value="${currentPhone}">`;
+    
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'action-btn save-btn';
+    saveBtn.innerHTML = '<i class="fas fa-save"></i>';
+    saveBtn.onclick = async () => {
+        const newName = nameDiv.querySelector('input').value;
+        const newPhone = phoneDiv.querySelector('input').value;
+        
+        try {
+            await updateDoc(doc(db, 'contacts', contactId), {
+                name: newName,
+                phone: newPhone,
+                lastUpdated: serverTimestamp()
+            });
+            
+            nameDiv.textContent = newName;
+            phoneDiv.textContent = newPhone;
+            saveBtn.remove();
+        } catch (error) {
+            alert('Error updating contact: ' + error.message);
+        }
+    };
+    
+    row.querySelector('.action-buttons').appendChild(saveBtn);
+};
+
+// Add toggle edit mode function
+window.toggleContactEdit = (contactId) => {
+    const row = document.querySelector(`tr[data-contactid="${contactId}"]`);
+    const editForm = row.querySelector('.contact-edit-form');
+    const displayInfo = row.querySelectorAll('.contact-name, .contact-phone');
+    const statusSelect = row.querySelector('.status-select');
+    const notesArea = row.querySelector('.notes-textarea');
+    const editBtn = row.querySelector('.edit-btn');
+    const saveBtn = row.querySelector('.save-btn');
+
+    const isEditing = editForm.style.display === 'none';
+    
+    // Toggle display
+    editForm.style.display = isEditing ? 'block' : 'none';
+    displayInfo.forEach(el => el.style.display = isEditing ? 'none' : 'block');
+    editBtn.style.display = isEditing ? 'none' : 'inline-flex';
+    saveBtn.style.display = isEditing ? 'inline-flex' : 'none';
+    
+    // Toggle form controls
+    statusSelect.disabled = !isEditing;
+    notesArea.readOnly = !isEditing;
+};
+
+// Add save changes function
+window.saveContactChanges = async (contactId) => {
+    const row = document.querySelector(`tr[data-contactid="${contactId}"]`);
+    const nameInput = row.querySelector('.inline-edit.name');
+    const phoneInput = row.querySelector('.inline-edit.phone');
+    const statusSelect = row.querySelector('.status-select');
+    const notesArea = row.querySelector('.notes-textarea');
+
+    try {
+        await updateDoc(doc(db, 'contacts', contactId), {
+            name: nameInput.value,
+            phone: phoneInput.value,
+            status: statusSelect.value,
+            notes: notesArea.value,
+            lastUpdated: serverTimestamp()
+        });
+
+        // Update display values
+        row.querySelector('.contact-name').textContent = nameInput.value;
+        row.querySelector('.contact-phone').textContent = phoneInput.value;
+        
+        // Exit edit mode
+        window.toggleContactEdit(contactId);
+        
+    } catch (error) {
+        alert('Error updating contact: ' + error.message);
+    }
+};
 
 // Contact Management Functions
 async function editContact(contactId) {

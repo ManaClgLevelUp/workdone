@@ -426,3 +426,80 @@ th {
     height: 44px;
     font-size: 1.2em;
 }
+
+/* Progress Table Inline Editing Styles */
+.progress-table .notes-textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: none;
+    font-family: inherit;
+    font-size: 0.9em;
+}
+
+.progress-table .status-select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.progress-table .inline-edit {
+    width: 100%;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: inherit;
+    margin: 2px 0;
+}
+
+.progress-table .save-btn {
+    background-color: #4CAF50;
+    color: white;
+    margin-left: 8px;
+}
+
+.progress-table td {
+    vertical-align: top;
+    min-width: 120px;
+}
+
+.progress-table .action-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+/* Progress Table Edit Mode Styles */
+.contact-edit-form {
+    margin-top: 8px;
+}
+
+.contact-edit-form input {
+    display: block;
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.progress-table .status-select:disabled,
+.progress-table .notes-textarea[readonly] {
+    background-color: #f9f9f9;
+    cursor: default;
+    opacity: 0.8;
+}
+
+.progress-table .notes-textarea:not([readonly]),
+.progress-table .status-select:not(:disabled) {
+    background-color: #fff;
+    border-color: #4CAF50;
+}
+
+.save-btn {
+    display: none;
+    background-color: #4CAF50;
+}
