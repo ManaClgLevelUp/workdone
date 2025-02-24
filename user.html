@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard</title>
+    <link rel="stylesheet" href="user.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="dashboard">
+        <header>
+            <div class="user-info">
+                <span id="userName">User</span>
+                <button id="logoutBtn">Logout</button>
+            </div>
+        </header>
+
+        <main class="content">
+            <div class="work-type-selector">
+                <button class="type-btn active" data-type="students">
+                    Registered Students
+                </button>
+                <button class="type-btn" data-type="sales">
+                    Sales Numbers
+                </button>
+            </div>
+
+            <div class="contact-list">
+                <div class="contact-filters">
+                    <select id="statusFilter">
+                        <option value="">All Status</option>
+                        <option value="notCalled">Not Called</option>
+                        <option value="answered">Answered</option>
+                        <option value="notAnswered">Not Answered</option>
+                        <option value="notInterested">Not Interested</option>
+                    </select>
+                </div>
+
+                <div class="contacts-grid" id="contactsData"></div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="user.js"></script>
+</body>
+</html>
