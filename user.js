@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, query, where, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, query, where, onSnapshot, updateDoc, serverTimestamp, addDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCve0_yChnzGgaSBtKh-yKvGopGo3psBQ8",
@@ -17,6 +17,8 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+let activityLogRef = null;
+
 // DOM Elements
 const userName = document.getElementById('userName');
 const logoutBtn = document.getElementById('logoutBtn');
@@ -27,6 +29,20 @@ const contactsData = document.getElementById('contactsData');
 let currentUser = null;
 let currentContactId = null;
 
+// Add this after Firebase initialization
+async function logPageVisit(userId, isOpen) {
+    try {
+        await addDoc(collection(db, 'pageVisits'), {
+            userId,
+            action: isOpen ? 'opened' : 'closed',
+            timestamp: serverTimestamp(),
+            date: new Date().toISOString().split('T')[0]
+        });
+    } catch (error) {
+        console.error('Error logging page visit:', error);
+    }
+}
+
 // Authentication State Observer
 onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -36,6 +52,38 @@ onAuthStateChanged(auth, async (user) => {
             currentUser = user;
             userName.textContent = userDoc.data().name || 'User';
             loadContacts('students'); // Default work type
+
+            // Log user login
+            const activityRef = await addDoc(collection(db, 'userActivities'), {
+                userId: user.uid,
+                type: 'login',
+                startTime: serverTimestamp(),
+                date: new Date().toISOString().split('T')[0]
+            });
+            activityLogRef = activityRef;
+
+            // Log page open
+            await logPageVisit(user.uid, true);
+
+            // Add page visibility change detection
+            document.addEventListener('visibilitychange', async () => {
+                if (document.visibilityState === 'hidden') {
+                    await logPageVisit(user.uid, false);
+                } else if (document.visibilityState === 'visible') {
+                    await logPageVisit(user.uid, true);
+                }
+            });
+
+            // Set up disconnect logging
+            window.addEventListener('beforeunload', async () => {
+                if (activityLogRef) {
+                    await updateDoc(activityLogRef, {
+                        endTime: serverTimestamp(),
+                        duration: firebase.firestore.FieldValue.increment(1)
+                    });
+                }
+                await logPageVisit(user.uid, false);
+            });
         } else {
             window.location.href = 'index.html';
         }
@@ -45,7 +93,13 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // Logout Handler
-logoutBtn.addEventListener('click', () => {
+logoutBtn.addEventListener('click', async () => {
+    if (activityLogRef) {
+        await updateDoc(activityLogRef, {
+            endTime: serverTimestamp(),
+            type: 'logout'
+        });
+    }
     signOut(auth).then(() => {
         window.location.href = 'index.html';
     });

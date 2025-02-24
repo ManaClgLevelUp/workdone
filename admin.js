@@ -14,12 +14,14 @@ import {
     addDoc,
     query,
     where,
+    orderBy,  // Add this import
+    limit,    // Add this import
     onSnapshot,
     updateDoc,
     deleteDoc,
     serverTimestamp,
     setDoc,
-    writeBatch // Add this import
+    writeBatch 
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -67,6 +69,14 @@ const addBulkContacts = document.getElementById('addBulkContacts');
 const progressUser = document.getElementById('progressUser');
 const progressWorkType = document.getElementById('progressWorkType');
 const progressData = document.getElementById('progressData');
+
+// Add after progress elements
+const activityDate = document.getElementById('activityDate');
+const firstLogin = document.getElementById('firstLogin');
+const lastLogout = document.getElementById('lastLogout');
+const totalDuration = document.getElementById('totalDuration');
+const sessionCount = document.getElementById('sessionCount');
+const activityTimeline = document.getElementById('activityTimeline');
 
 // Auth state observer
 onAuthStateChanged(auth, async (user) => {
@@ -349,14 +359,96 @@ window.adminSendWhatsApp = async (contactId, phone) => {
     });
 };
 
+// Add new function to format log time
+function formatLogTime(timestamp) {
+    if (!timestamp) return '-';
+    const date = timestamp.toDate();
+    return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+    });
+}
+
+// Update loadUserPageVisits function
+async function loadUserPageVisits(userId, date) {
+    const visitsLog = document.getElementById('visitsLog');
+    const totalTimeToday = document.getElementById('totalTimeToday');
+    const pageOpens = document.getElementById('pageOpens');
+
+    if (!userId || !date) {
+        visitsLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
+        return;
+    }
+
+    try {
+        const q = query(
+            collection(db, 'pageVisits'),
+            where('userId', '==', userId),
+            where('date', '==', date),
+            orderBy('timestamp', 'desc'),
+            limit(50)
+        );
+
+        const snapshot = await getDocs(q);
+        let visits = [];
+        let totalDuration = 0;
+        let openCount = 0;
+
+        snapshot.docs.forEach(doc => {
+            const visit = doc.data();
+            visits.push({
+                time: visit.timestamp,
+                action: visit.action,
+                duration: 0
+            });
+        });
+
+        // Calculate durations
+        for (let i = 0; i < visits.length - 1; i++) {
+            if (visits[i].action === 'closed' && visits[i + 1].action === 'opened') {
+                const duration = visits[i].time.toMillis() - visits[i + 1].time.toMillis();
+                visits[i].duration = duration;
+                totalDuration += duration;
+                openCount++;
+            }
+        }
+
+        // Generate HTML for the first 5 rows
+        const html = visits.slice(0, 5).map(visit => `
+            <tr>
+                <td>${formatLogTime(visit.time)}</td>
+                <td><span class="action-badge ${visit.action}">${visit.action}</span></td>
+                <td>${visit.duration ? formatDuration(visit.duration) : '-'}</td>
+            </tr>
+        `).join('');
+
+        visitsLog.innerHTML = html || '<tr><td colspan="3">No visits recorded for this date</td></tr>';
+        totalTimeToday.textContent = formatDuration(totalDuration);
+        pageOpens.textContent = openCount;
+
+    } catch (error) {
+        console.error('Error loading visits:', error);
+        visitsLog.innerHTML = '<tr><td colspan="3">Error loading data</td></tr>';
+    }
+}
+
+// Update setupProgressListener function
 function setupProgressListener() {
     if (progressUnsubscribe) {
         progressUnsubscribe();
     }
 
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('activityDate').value = today;
+
     if (!progressUser.value) {
         document.getElementById('userContactInfo').innerHTML = '';
         progressData.innerHTML = '';
+        resetActivityDisplay();
+        document.getElementById('visitsLog').innerHTML = '';
+        document.getElementById('activityLog').innerHTML = '';
         return;
     }
 
@@ -444,7 +536,70 @@ function setupProgressListener() {
             `;
         }).join('');
     });
+
+    // Add activity loading
+    loadUserActivities(progressUser.value, today);
+
+    // Load page visits for today by default
+    loadUserPageVisits(progressUser.value, today);
 }
+
+// Update loadUserActivities function
+async function loadUserActivities(userId, date) {
+    const activityLog = document.getElementById('activityLog');
+
+    if (!userId || !date) {
+        activityLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
+        return;
+    }
+
+    try {
+        const q = query(
+            collection(db, 'userActivities'),
+            where('userId', '==', userId),
+            where('date', '==', date),
+            orderBy('startTime', 'desc'),
+            limit(50)
+        );
+
+        const snapshot = await getDocs(q);
+        const activities = snapshot.docs.map(doc => ({
+            ...doc.data(),
+            id: doc.id
+        }));
+
+        // Generate HTML for the first 5 activities
+        const html = activities.slice(0, 5).map(activity => {
+            const startTime = activity.startTime;
+            const endTime = activity.endTime;
+            const duration = startTime && endTime ? 
+                formatDuration(endTime.toMillis() - startTime.toMillis()) : '-';
+
+            return `
+                <tr>
+                    <td>${formatLogTime(startTime)}</td>
+                    <td>${activity.type || 'Page Visit'}</td>
+                    <td>${duration}</td>
+                </tr>
+            `;
+        }).join('');
+
+        activityLog.innerHTML = html || '<tr><td colspan="3">No activities recorded for this date</td></tr>';
+
+    } catch (error) {
+        console.error('Error loading activities:', error);
+        activityLog.innerHTML = '<tr><td colspan="3">Error loading data</td></tr>';
+    }
+}
+
+// Add date change handler
+document.getElementById('activityDate').addEventListener('change', (e) => {
+    if (progressUser.value) {
+        const selectedDate = e.target.value;
+        loadUserPageVisits(progressUser.value, selectedDate);
+        loadUserActivities(progressUser.value, selectedDate);
+    }
+});
 
 // Add new contact management functions to window object
 window.updateContactStatus = async (contactId, status) => {
@@ -581,4 +736,42 @@ async function deleteContact(contactId) {
             alert('Error deleting contact: ' + error.message);
         }
     }
+}
+
+// Add activity date change handler
+activityDate.addEventListener('change', () => {
+    if (progressUser.value) {
+        loadUserActivities(progressUser.value, activityDate.value);
+        loadUserPageVisits(progressUser.value, activityDate.value);
+    }
+});
+
+function formatDateTime(date) {
+    return date.toLocaleString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
+}
+
+function formatDuration(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    if (hours > 0) {
+        return `${hours}h ${minutes % 60}m`;
+    }
+    if (minutes > 0) {
+        return `${minutes}m ${seconds % 60}s`;
+    }
+    return `${seconds}s`;
+}
+
+function resetActivityDisplay() {
+    firstLogin.textContent = '-';
+    lastLogout.textContent = '-';
+    totalDuration.textContent = '-';
+    sessionCount.textContent = '-';
+    activityTimeline.innerHTML = '';
 }
