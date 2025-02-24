@@ -187,6 +187,7 @@ onAuthStateChanged(auth, async (user) => {
             loadUsers();
             loadExistingUsers(); // Add this line
             initTheme(); // Initialize theme
+            initMobileMenu(); // Initialize mobile menu after DOM is ready
         } else {
             window.location.href = 'index.html';
         }
@@ -947,4 +948,45 @@ function calculateDuration(startTime, endTime) {
     const start = startTime instanceof Date ? startTime : startTime.toDate();
     const end = endTime instanceof Date ? endTime : endTime.toDate();
     return end.getTime() - start.getTime();
+}
+
+// Update the mobile menu initialization
+function initMobileMenu() {
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+    if (!menuToggle || !sidebar || !sidebarOverlay) {
+        console.error('Mobile menu elements not found');
+        return;
+    }
+
+    function toggleMenu() {
+        sidebar.classList.toggle('active');
+        menuToggle.classList.toggle('active');
+        sidebarOverlay.classList.toggle('active');
+        menuToggle.innerHTML = sidebar.classList.contains('active') ? 
+            '<i class="fas fa-times"></i>' : 
+            '<i class="fas fa-bars"></i>';
+    }
+
+    // Remove any existing listeners first
+    menuToggle.removeEventListener('click', toggleMenu);
+    sidebarOverlay.removeEventListener('click', toggleMenu);
+
+    // Add fresh event listeners
+    menuToggle.addEventListener('click', toggleMenu);
+    sidebarOverlay.addEventListener('click', toggleMenu);
+
+    // Close menu when clicking nav buttons on mobile
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('active');
+                menuToggle.classList.remove('active');
+                sidebarOverlay.classList.remove('active');
+                menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+            }
+        });
+    });
 }
