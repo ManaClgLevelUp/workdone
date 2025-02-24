@@ -17,7 +17,7 @@
 }
 
 [data-theme="dark"] {
-    /* Dark Theme Colors */
+    /* Update dark theme colors */
     --primary-color: #3498db;
     --secondary-color: #2c3e50;
     --accent-color: #e74c3c;
@@ -26,11 +26,19 @@
     --text-primary: #ecf0f1;
     --text-secondary: #bdc3c7;
     --border-color: #34495e;
-    --sidebar-bg: #2d2d2d;
+    --sidebar-bg: #1a1a1a;
     --sidebar-text: #ecf0f1;
     --header-bg: #2c3e50;
     --header-text: #ecf0f1;
     --card-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    --hover-bg: rgba(52, 152, 219, 0.1);
+    --activity-bg: #2d2d2d;
+    --table-header: #1a1a1a;
+    --table-row-even: #262626;
+    --table-border: #34495e;
+    --input-bg: #262626;
+    --input-disabled: #363636;
+    --input-text: #ecf0f1;
 }
 
 /* Base Styles */
@@ -687,6 +695,7 @@ tr:hover {
     position: sticky;
     top: 0;
     background: #fff;
+    color: var(--text-secondary);
     z-index: 1;
     border-bottom: 2px solid #4CAF50;
 }
@@ -910,4 +919,81 @@ tr:hover {
 [data-theme="dark"] select,
 [data-theme="dark"] textarea {
     background-color: var(--sidebar-bg);
+}
+
+[data-theme="dark"] .activity-section,
+[data-theme="dark"] .user-activity-info,
+[data-theme="dark"] .stat-item {
+    background: var(--activity-bg);
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .log-table th {
+    background: var(--table-header);
+    color: var(--header-text);
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .log-table tr:nth-child(even) {
+    background: var(--table-row-even);
+}
+
+[data-theme="dark"] .log-table tr:hover {
+    background: var(--hover-bg);
+}
+
+[data-theme="dark"] .log-table td {
+    border-color: var(--table-border);
+}
+
+[data-theme="dark"] .stat-item label {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .status-select,
+[data-theme="dark"] .notes-textarea {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .status-select:disabled,
+[data-theme="dark"] .notes-textarea[readonly] {
+    background-color: var(--input-disabled);
+    color: var(--text-secondary);
+    opacity: 0.8;
+}
+
+[data-theme="dark"] thead th {
+    background-color: var(--table-header);
+    color: var(--header-text);
+    border-bottom: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .user-contact-info {
+    background-color: var(--activity-bg);
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .user-contact-info strong {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .user-phone {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .user-contact-row {
+    background-color: var(--activity-bg);
+    border-color: var(--primary-color);
+    box-shadow: var(--card-shadow);
+}
+
+[data-theme="dark"] .contact-lastupdate {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .status-select option {
+    background-color: var(--input-bg);
+    color: var(--input-text);
 }

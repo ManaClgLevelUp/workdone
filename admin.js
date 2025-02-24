@@ -139,19 +139,42 @@ function initTheme() {
 }
 
 function updateThemeIcon(theme) {
-    themeToggle.innerHTML = theme === 'dark' ? 
-        '<i class="fas fa-sun"></i>' : 
-        '<i class="fas fa-moon"></i>';
+    if (themeToggle) {
+        themeToggle.innerHTML = theme === 'dark' ? 
+            '<i class="fas fa-sun"></i>' : 
+            '<i class="fas fa-moon"></i>';
+    }
 }
 
-themeToggle.addEventListener('click', () => {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-    updateThemeIcon(newTheme);
-});
+// Add null checks for event listeners
+if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        updateThemeIcon(newTheme);
+    });
+}
+
+if (menuToggle && sidebar && sidebarOverlay) {
+    menuToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('active');
+        menuToggle.classList.toggle('active');
+        sidebarOverlay.classList.toggle('active');
+        menuToggle.innerHTML = sidebar.classList.contains('active') ? 
+            '<i class="fas fa-times"></i>' : 
+            '<i class="fas fa-bars"></i>';
+    });
+
+    sidebarOverlay.addEventListener('click', () => {
+        sidebar.classList.remove('active');
+        menuToggle.classList.remove('active');
+        sidebarOverlay.classList.remove('active');
+        menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+    });
+}
 
 // Auth state observer
 onAuthStateChanged(auth, async (user) => {

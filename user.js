@@ -27,6 +27,7 @@ const logoutBtn = document.getElementById('logoutBtn');
 const typeButtons = document.querySelectorAll('.type-btn');
 const statusFilter = document.getElementById('statusFilter');
 const contactsData = document.getElementById('contactsData');
+const themeToggle = document.getElementById('themeToggle');
 
 let touchStartY = 0;
 const contactsGrid = document.getElementById('contactsData');
@@ -121,6 +122,8 @@ onAuthStateChanged(auth, async (user) => {
                 }
                 await logPageVisit(user.uid, false);
             });
+
+            initTheme(); // Initialize theme
         } else {
             window.location.href = 'index.html';
         }
@@ -347,3 +350,29 @@ document.querySelectorAll('.action-btn').forEach(btn => {
         btn.style.transform = 'scale(1)';
     });
 });
+
+// Add theme toggle functionality
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+}
+
+function updateThemeIcon(theme) {
+    if (themeToggle) {
+        themeToggle.innerHTML = theme === 'dark' ? 
+            '<i class="fas fa-sun"></i>' : 
+            '<i class="fas fa-moon"></i>';
+    }
+}
+
+if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        updateThemeIcon(newTheme);
+    });
+}
