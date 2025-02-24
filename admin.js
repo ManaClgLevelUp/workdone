@@ -342,7 +342,7 @@ window.adminMakeCall = async (contactId, phone) => {
 
 window.adminSendWhatsApp = async (contactId, phone) => {
     const formattedPhone = phone.startsWith('+') ? phone.substring(1) : phone;
-    window.open(`https://wa.me/${formattedPhone}`, '_blank');
+    window.open(`https://wa.me/91${formattedPhone}`, '_blank');
     await updateDoc(doc(db, 'contacts', contactId), {
         adminWhatsappTime: serverTimestamp(),
         lastUpdated: serverTimestamp()
