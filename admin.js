@@ -449,35 +449,46 @@ async function loadUserPageVisits(userId, date) {
         );
 
         pageVisitsUnsubscribe = onSnapshot(q, (snapshot) => {
-            const events = snapshot.docs.map(doc => ({
-                ...doc.data(),
-                id: doc.id
-            }));
-
             let visits = [];
             let totalDuration = 0;
             let openCount = 0;
+            const openedVisits = new Map();
 
-            // Process events to pair open/close events
-            for (let i = 0; i < events.length - 1; i++) {
-                const current = events[i];
-                const next = events[i + 1];
+            // First pass: collect all opened visits
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (data.action === 'opened') {
+                    openedVisits.set(doc.id, {
+                        openTime: data.timestamp,
+                        id: doc.id
+                    });
+                }
+            });
 
-                if (current.action === 'closed' && next.action === 'opened') {
-                    const duration = current.timestamp.toMillis() - next.timestamp.toMillis();
-                    if (duration > 0) {
-                        visits.push({
-                            openTime: next.timestamp,
-                            closeTime: current.timestamp,
-                            duration: duration
-                        });
-                        totalDuration += duration;
-                        openCount++;
+            // Second pass: match closed visits with opened ones
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (data.action === 'closed' && data.openedDocId) {
+                    const openedVisit = openedVisits.get(data.openedDocId);
+                    if (openedVisit) {
+                        const duration = data.timestamp.toMillis() - openedVisit.openTime.toMillis();
+                        if (duration > 0) {
+                            visits.push({
+                                openTime: openedVisit.openTime,
+                                closeTime: data.timestamp,
+                                duration: duration
+                            });
+                            totalDuration += duration;
+                            openCount++;
+                        }
                     }
                 }
-            }
+            });
 
-            // Generate table rows with fade-in effect
+            // Sort visits by most recent first
+            visits.sort((a, b) => b.openTime.toMillis() - a.openTime.toMillis());
+
+            // Generate HTML with visibility classes
             const html = visits.map((visit, index) => `
                 <tr class="${index < 5 ? 'visible' : 'hidden'}" style="animation-delay: ${index * 0.1}s">
                     <td>${formatLogTime(visit.openTime)}</td>
@@ -490,9 +501,9 @@ async function loadUserPageVisits(userId, date) {
             totalTimeToday.textContent = formatDuration(totalDuration);
             pageOpens.textContent = openCount;
 
-            // Setup infinite scroll
-            const tableContainer = visitsLog.closest('.log-table-container');
+            // Set up infinite scroll
             if (visits.length > 5) {
+                const tableContainer = visitsLog.closest('.log-table-container');
                 tableContainer.onscroll = () => {
                     if (tableContainer.scrollTop + tableContainer.clientHeight >= tableContainer.scrollHeight - 20) {
                         const hiddenRows = visitsLog.querySelectorAll('tr.hidden');

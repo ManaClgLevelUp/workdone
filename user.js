@@ -35,19 +35,32 @@ let currentUser = null;
 let currentContactId = null;
 
 // Add this after Firebase initialization
+let lastVisitDoc = null;
+
 async function logPageVisit(action) {
     if (!currentUserId) return;
     
     try {
-        const visitDoc = await addDoc(collection(db, 'pageVisits'), {
-            userId: currentUserId,
-            action: action,
-            timestamp: serverTimestamp(),
-            date: new Date().toISOString().split('T')[0]
-        });
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date().toISOString().split('T')[0];
         
         if (action === 'opened') {
-            pageVisitDoc = visitDoc;
+            const visitDoc = await addDoc(collection(db, 'pageVisits'), {
+                userId: currentUserId,
+                action: 'opened',
+                timestamp: serverTimestamp(),
+                date: today
+            });
+            lastVisitDoc = visitDoc;
+        } else if (action === 'closed' && lastVisitDoc) {
+            await addDoc(collection(db, 'pageVisits'), {
+                userId: currentUserId,
+                action: 'closed',
+                timestamp: serverTimestamp(),
+                date: today,
+                openedDocId: lastVisitDoc.id
+            });
+            lastVisitDoc = null;
         }
     } catch (error) {
         console.error('Error logging page visit:', error);
