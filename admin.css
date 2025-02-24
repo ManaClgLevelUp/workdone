@@ -740,3 +740,92 @@ th {
     from { opacity: 0; }
     to { opacity: 1; }
 }
+
+/* Mobile Responsive Styles */
+@media screen and (max-width: 768px) {
+    .dashboard {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: -250px;
+        top: 64px;
+        height: calc(100vh - 64px);
+        width: 250px;
+        transition: left 0.3s ease;
+        z-index: 1000;
+    }
+
+    .sidebar.active {
+        left: 0;
+    }
+
+    .menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border: none;
+        background: transparent;
+        color: white;
+        font-size: 1.5rem;
+        cursor: pointer;
+    }
+
+    .menu-toggle.active {
+        color: #4CAF50;
+    }
+
+    /* Adjust content padding */
+    .content {
+        padding: 1rem;
+    }
+
+    /* Make tables scrollable */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Adjust form layouts */
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .input-group {
+        flex-direction: column;
+    }
+
+    .input-group input {
+        margin-bottom: 0.5rem;
+    }
+
+    /* Adjust activity logs layout */
+    .activity-logs {
+        grid-template-columns: 1fr;
+    }
+
+    /* Make cards full width */
+    .contact-card {
+        width: 100%;
+    }
+}
+
+/* Add overlay for mobile menu */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+.sidebar-overlay.active {
+    display: block;
+}

@@ -18,6 +18,8 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let activityLogRef = null;
+let currentUserId = null;
+let pageVisitDoc = null;
 
 // DOM Elements
 const userName = document.getElementById('userName');
@@ -26,18 +28,27 @@ const typeButtons = document.querySelectorAll('.type-btn');
 const statusFilter = document.getElementById('statusFilter');
 const contactsData = document.getElementById('contactsData');
 
+let touchStartY = 0;
+const contactsGrid = document.getElementById('contactsData');
+
 let currentUser = null;
 let currentContactId = null;
 
 // Add this after Firebase initialization
-async function logPageVisit(userId, isOpen) {
+async function logPageVisit(action) {
+    if (!currentUserId) return;
+    
     try {
-        await addDoc(collection(db, 'pageVisits'), {
-            userId,
-            action: isOpen ? 'opened' : 'closed',
+        const visitDoc = await addDoc(collection(db, 'pageVisits'), {
+            userId: currentUserId,
+            action: action,
             timestamp: serverTimestamp(),
             date: new Date().toISOString().split('T')[0]
         });
+        
+        if (action === 'opened') {
+            pageVisitDoc = visitDoc;
+        }
     } catch (error) {
         console.error('Error logging page visit:', error);
     }
@@ -50,7 +61,18 @@ onAuthStateChanged(auth, async (user) => {
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists() && userDoc.data().role === 'user') {
             currentUser = user;
+            currentUserId = user.uid;
             userName.textContent = userDoc.data().name || 'User';
+            
+            // Log page open
+            await logPageVisit('opened');
+
+            // Add page visibility change detection
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            
+            // Add beforeunload event listener
+            window.addEventListener('beforeunload', handleBeforeUnload);
+
             loadContacts('students'); // Default work type
 
             // Log user login
@@ -92,8 +114,22 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
+// Add these new functions
+async function handleVisibilityChange() {
+    if (document.visibilityState === 'hidden') {
+        await logPageVisit('closed');
+    } else if (document.visibilityState === 'visible') {
+        await logPageVisit('opened');
+    }
+}
+
+async function handleBeforeUnload(event) {
+    await logPageVisit('closed');
+}
+
 // Logout Handler
 logoutBtn.addEventListener('click', async () => {
+    await logPageVisit('closed');
     if (activityLogRef) {
         await updateDoc(activityLogRef, {
             endTime: serverTimestamp(),
@@ -261,4 +297,38 @@ window.handleNotesInput = debounce(async (textarea, contactId) => {
 statusFilter.addEventListener('change', () => {
     const activeWorkType = document.querySelector('.type-btn.active').dataset.type;
     loadContacts(activeWorkType);
+});
+
+// Add pull-to-refresh functionality
+contactsGrid.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+});
+
+contactsGrid.addEventListener('touchmove', (e) => {
+    const touchY = e.touches[0].clientY;
+    const diff = touchY - touchStartY;
+    
+    if (diff > 50 && contactsGrid.scrollTop === 0) {
+        contactsGrid.classList.add('refreshing');
+        e.preventDefault();
+    }
+});
+
+contactsGrid.addEventListener('touchend', (e) => {
+    if (contactsGrid.classList.contains('refreshing')) {
+        contactsGrid.classList.remove('refreshing');
+        const activeWorkType = document.querySelector('.type-btn.active').dataset.type;
+        loadContacts(activeWorkType); // Refresh data
+    }
+});
+
+// Add touch feedback to buttons
+document.querySelectorAll('.action-btn').forEach(btn => {
+    btn.addEventListener('touchstart', () => {
+        btn.style.transform = 'scale(0.95)';
+    });
+    
+    btn.addEventListener('touchend', () => {
+        btn.style.transform = 'scale(1)';
+    });
 });

@@ -219,3 +219,83 @@ th {
     border-radius: 4px;
     background: #f9f9f9;
 }
+
+/* Mobile Responsive Styles */
+@media screen and (max-width: 768px) {
+    .content {
+        padding: 1rem;
+    }
+
+    .work-type-selector {
+        flex-wrap: wrap;
+    }
+
+    .type-btn {
+        flex: 1;
+        min-width: 150px;
+        padding: 0.8rem;
+        font-size: 0.9rem;
+    }
+
+    .contacts-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+        padding: 10px;
+    }
+
+    .contact-card {
+        margin-bottom: 15px;
+    }
+
+    .contact-actions {
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .action-btn {
+        flex: 1;
+        min-width: 100px;
+    }
+
+    .contact-notes textarea {
+        min-height: 80px;
+    }
+
+    .contact-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .contact-filters select {
+        flex: 1;
+        min-width: 150px;
+    }
+
+    /* Improve touch targets */
+    .action-btn {
+        min-height: 44px;
+        padding: 10px;
+    }
+
+    select, input {
+        min-height: 44px;
+        font-size: 16px; /* Prevent iOS zoom */
+    }
+
+    /* Add pull-to-refresh indicator */
+    .contacts-grid {
+        position: relative;
+    }
+
+    .refresh-indicator {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+        display: none;
+    }
+
+    .refreshing .refresh-indicator {
+        display: block;
+    }
+}

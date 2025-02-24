@@ -94,6 +94,40 @@ toggleBtns.forEach(btn => {
     });
 });
 
+// Add after DOM Elements
+const menuToggle = document.getElementById('menuToggle');
+const sidebar = document.querySelector('.sidebar');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+// Add mobile menu handlers
+menuToggle.addEventListener('click', () => {
+    sidebar.classList.toggle('active');
+    menuToggle.classList.toggle('active');
+    sidebarOverlay.classList.toggle('active');
+    menuToggle.innerHTML = sidebar.classList.contains('active') ? 
+        '<i class="fas fa-times"></i>' : 
+        '<i class="fas fa-bars"></i>';
+});
+
+sidebarOverlay.addEventListener('click', () => {
+    sidebar.classList.remove('active');
+    menuToggle.classList.remove('active');
+    sidebarOverlay.classList.remove('active');
+    menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+});
+
+// Close sidebar when clicking nav buttons on mobile
+navBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+            sidebar.classList.remove('active');
+            menuToggle.classList.remove('active');
+            sidebarOverlay.classList.remove('active');
+            menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+        }
+    });
+});
+
 // Auth state observer
 onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -395,7 +429,7 @@ async function loadUserPageVisits(userId, date) {
     const totalTimeToday = document.getElementById('totalTimeToday');
     const pageOpens = document.getElementById('pageOpens');
 
-    // Cleanup previous listener
+    // Clear previous listener
     if (pageVisitsUnsubscribe) {
         pageVisitsUnsubscribe();
         pageVisitsUnsubscribe = null;
@@ -411,42 +445,41 @@ async function loadUserPageVisits(userId, date) {
             collection(db, 'pageVisits'),
             where('userId', '==', userId),
             where('date', '==', date),
-            orderBy('timestamp', 'asc')
+            orderBy('timestamp', 'desc')
         );
 
-        // Use onSnapshot instead of getDocs for real-time updates
         pageVisitsUnsubscribe = onSnapshot(q, (snapshot) => {
+            const events = snapshot.docs.map(doc => ({
+                ...doc.data(),
+                id: doc.id
+            }));
+
             let visits = [];
             let totalDuration = 0;
             let openCount = 0;
-            let openTime = null;
 
-            // Process events in chronological order
-            snapshot.docs.forEach(doc => {
-                const event = doc.data();
-                if (event.action === 'opened') {
-                    openTime = event.timestamp;
-                } else if (event.action === 'closed' && openTime) {
-                    const duration = event.timestamp.toMillis() - openTime.toMillis();
+            // Process events to pair open/close events
+            for (let i = 0; i < events.length - 1; i++) {
+                const current = events[i];
+                const next = events[i + 1];
+
+                if (current.action === 'closed' && next.action === 'opened') {
+                    const duration = current.timestamp.toMillis() - next.timestamp.toMillis();
                     if (duration > 0) {
                         visits.push({
-                            openTime: openTime,
-                            closeTime: event.timestamp,
+                            openTime: next.timestamp,
+                            closeTime: current.timestamp,
                             duration: duration
                         });
                         totalDuration += duration;
                         openCount++;
                     }
-                    openTime = null;
                 }
-            });
+            }
 
-            // Sort visits by open time in descending order (most recent first)
-            visits.sort((a, b) => b.openTime.toMillis() - a.openTime.toMillis());
-
-            // Generate HTML for all visits with visibility classes
+            // Generate table rows with fade-in effect
             const html = visits.map((visit, index) => `
-                <tr class="${index < 5 ? 'visible' : 'hidden'}">
+                <tr class="${index < 5 ? 'visible' : 'hidden'}" style="animation-delay: ${index * 0.1}s">
                     <td>${formatLogTime(visit.openTime)}</td>
                     <td>${formatLogTime(visit.closeTime)}</td>
                     <td>${formatDuration(visit.duration)}</td>
@@ -457,25 +490,27 @@ async function loadUserPageVisits(userId, date) {
             totalTimeToday.textContent = formatDuration(totalDuration);
             pageOpens.textContent = openCount;
 
-            // Add scroll listener for lazy loading
+            // Setup infinite scroll
             const tableContainer = visitsLog.closest('.log-table-container');
             if (visits.length > 5) {
                 tableContainer.onscroll = () => {
                     if (tableContainer.scrollTop + tableContainer.clientHeight >= tableContainer.scrollHeight - 20) {
                         const hiddenRows = visitsLog.querySelectorAll('tr.hidden');
                         hiddenRows.forEach((row, index) => {
-                            if (index < 5) row.classList.replace('hidden', 'visible');
+                            if (index < 5) {
+                                row.classList.replace('hidden', 'visible');
+                            }
                         });
                     }
                 };
             }
         }, (error) => {
-            console.error('Error loading visits:', error);
+            console.error('Error in page visits subscription:', error);
             visitsLog.innerHTML = '<tr><td colspan="3">Error loading data</td></tr>';
         });
 
     } catch (error) {
-        console.error('Error setting up visits listener:', error);
+        console.error('Error setting up page visits:', error);
         visitsLog.innerHTML = '<tr><td colspan="3">Error loading data</td></tr>';
     }
 }
