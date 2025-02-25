@@ -997,3 +997,76 @@ tr:hover {
     background-color: var(--input-bg);
     color: var(--input-text);
 }
+
+/* Contact Preview Styles */
+.preview-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.preview-content {
+    background: var(--surface-color);
+    padding: 2rem;
+    border-radius: 8px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.preview-list {
+    margin: 1rem 0;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.contact-preview {
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    background: var(--background-color);
+}
+
+.preview-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+.confirm-btn, .cancel-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.confirm-btn {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.cancel-btn {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+/* Dark mode specific styles */
+[data-theme="dark"] .preview-content {
+    background: var(--surface-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .contact-preview {
+    background: var(--activity-bg);
+    border-color: var(--border-color);
+}

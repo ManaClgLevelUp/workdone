@@ -3,7 +3,9 @@ import {
     getAuth, 
     onAuthStateChanged, 
     signOut,
-    createUserWithEmailAndPassword 
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    fetchSignInMethodsForEmail  // Add this import
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 import { 
     getFirestore, 
@@ -23,6 +25,7 @@ import {
     setDoc,
     writeBatch 
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { deleteApp, initializeApp as initializeSecondaryApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCve0_yChnzGgaSBtKh-yKvGopGo3psBQ8",
@@ -214,12 +217,65 @@ logoutBtn.addEventListener('click', () => {
     });
 });
 
-// Create User Handler
+// Add this helper function at the top level
+async function deleteUserAndAssociatedData(userId) {
+    try {
+        const batch = writeBatch(db);
+        
+        // Delete user's page visits
+        const visitsQuery = query(collection(db, 'pageVisits'), where('userId', '==', userId));
+        const visitsSnapshot = await getDocs(visitsQuery);
+        visitsSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        // Delete user's activities
+        const activitiesQuery = query(collection(db, 'userActivities'), where('userId', '==', userId));
+        const activitiesSnapshot = await getDocs(activitiesQuery);
+        activitiesSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        // Delete assigned contacts
+        const contactsQuery = query(collection(db, 'contacts'), where('assignedTo', '==', userId));
+        const contactsSnapshot = await getDocs(contactsQuery);
+        contactsSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        // Delete the user document
+        batch.delete(doc(db, 'users', userId));
+
+        // Commit all deletions
+        await batch.commit();
+
+        return true;
+    } catch (error) {
+        console.error('Error deleting user data:', error);
+        throw error;
+    }
+}
+
+// Replace the createUserForm event listener with this simpler version
 createUserForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    
     try {
-        const userCredential = await createUserWithEmailAndPassword(auth, userId.value, userPassword.value);
+        // Check if email already exists
+        const methods = await fetchSignInMethodsForEmail(auth, userId.value);
+        if (methods.length > 0) {
+            alert('This email is already registered');
+            return;
+        }
+
+        // Create a secondary app instance
+        const secondaryApp = initializeSecondaryApp(firebaseConfig, "Secondary");
+        const secondaryAuth = getAuth(secondaryApp);
         
+        // Create new user with secondary auth instance
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, userId.value, userPassword.value);
+        
+        // Save user data in Firestore using the main db (admin remains logged in)
         await setDoc(doc(db, 'users', userCredential.user.uid), {
             name: userName.value,
             email: userId.value,
@@ -227,12 +283,148 @@ createUserForm.addEventListener('submit', async (e) => {
             role: 'user',
             createdAt: serverTimestamp()
         });
+        
+        // Delete the secondary app so that the admin session remains intact
+        await deleteApp(secondaryApp);
 
-        alert('User created successfully');
+        // Clear the form and show success message
         createUserForm.reset();
-        loadExistingUsers(); // Refresh users list
+        alert('User created successfully');
+        loadExistingUsers();
     } catch (error) {
+        console.error('Error creating user:', error);
         alert('Error creating user: ' + error.message);
+    }
+});
+
+// Update the delete user function to delete all associated data
+window.deleteUser = async (userId) => {
+    if (confirm('Are you sure you want to delete this user and ALL their associated data?')) {
+        try {
+            await deleteUserAndAssociatedData(userId);
+            loadExistingUsers(); // Refresh the list
+            loadUsers(); // Refresh select dropdowns
+            alert('User and all associated data deleted successfully');
+        } catch (error) {
+            alert('Error deleting user: ' + error.message);
+        }
+    }
+};
+
+// Add contact preview functionality
+function showContactPreview(contacts) {
+    const previewHTML = contacts.map(contact => `
+        <div class="contact-preview">
+            <div class="contact-name">${contact.name}</div>
+            <div class="contact-phone">${formatPhoneNumber(contact.phone)}</div>
+        </div>
+    `).join('');
+
+    const previewDialog = document.createElement('div');
+    previewDialog.className = 'preview-dialog';
+    previewDialog.innerHTML = `
+        <div class="preview-content">
+            <h3>Preview Contacts</h3>
+            <div class="preview-list">${previewHTML}</div>
+            <div class="preview-actions">
+                <button class="confirm-btn">Confirm</button>
+                <button class="cancel-btn">Cancel</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(previewDialog);
+
+    return new Promise((resolve) => {
+        const confirmBtn = previewDialog.querySelector('.confirm-btn');
+        const cancelBtn = previewDialog.querySelector('.cancel-btn');
+
+        confirmBtn.onclick = () => {
+            previewDialog.remove();
+            resolve(true);
+        };
+
+        cancelBtn.onclick = () => {
+            previewDialog.remove();
+            resolve(false);
+        };
+    });
+}
+
+// Update single contact addition with preview
+addSingleContact.addEventListener('click', async () => {
+    if (!selectUser.value || !contactName.value || !contactPhone.value) {
+        alert('Please fill all fields');
+        return;
+    }
+
+    const contact = {
+        name: contactName.value,
+        phone: formatPhoneNumber(contactPhone.value)
+    };
+
+    const confirmed = await showContactPreview([contact]);
+    if (!confirmed) return;
+
+    try {
+        await addDoc(collection(db, 'contacts'), {
+            ...contact,
+            assignedTo: selectUser.value,
+            workType: workType.value,
+            status: 'notCalled',
+            createdAt: serverTimestamp()
+        });
+
+        contactName.value = '';
+        contactPhone.value = '';
+        alert('Contact assigned successfully');
+    } catch (error) {
+        alert('Error assigning contact: ' + error.message);
+    }
+});
+
+// Update bulk contacts addition with preview
+addBulkContacts.addEventListener('click', async () => {
+    if (!selectUser.value || !bulkContacts.value) {
+        alert('Please select user and enter contacts');
+        return;
+    }
+
+    const contacts = bulkContacts.value.split('\n')
+        .map(line => {
+            const parts = line.includes(':') ? line.split(':') : line.split('\t');
+            const [name, phone] = parts.map(item => item.trim());
+            return name && phone ? { name, phone: formatPhoneNumber(phone) } : null;
+        })
+        .filter(contact => contact !== null);
+
+    if (contacts.length === 0) {
+        alert('No valid contacts found');
+        return;
+    }
+
+    const confirmed = await showContactPreview(contacts);
+    if (!confirmed) return;
+
+    try {
+        const batch = writeBatch(db);
+        
+        contacts.forEach(contact => {
+            const newDocRef = doc(collection(db, 'contacts'));
+            batch.set(newDocRef, {
+                ...contact,
+                assignedTo: selectUser.value,
+                workType: workType.value,
+                status: 'notCalled',
+                createdAt: serverTimestamp()
+            });
+        });
+
+        await batch.commit();
+        bulkContacts.value = '';
+        alert('Bulk contacts assigned successfully');
+    } catch (error) {
+        alert('Error assigning bulk contacts: ' + error.message);
     }
 });
 
@@ -348,17 +540,6 @@ window.editUser = async (userId) => {
     }
 };
 
-window.deleteUser = async (userId) => {
-    if (confirm('Are you sure you want to delete this user?')) {
-        try {
-            await deleteDoc(doc(db, 'users', userId));
-            loadExistingUsers(); // Refresh the list
-        } catch (error) {
-            alert('Error deleting user: ' + error.message);
-        }
-    }
-};
-
 // Helper function to format phone number
 function formatPhoneNumber(phone) {
     // Remove any non-digit characters
@@ -381,10 +562,17 @@ addSingleContact.addEventListener('click', async () => {
         return;
     }
 
+    const contact = {
+        name: contactName.value,
+        phone: formatPhoneNumber(contactPhone.value)
+    };
+
+    const confirmed = await showContactPreview([contact]);
+    if (!confirmed) return;
+
     try {
         await addDoc(collection(db, 'contacts'), {
-            name: contactName.value,
-            phone: formatPhoneNumber(contactPhone.value),
+            ...contact,
             assignedTo: selectUser.value,
             workType: workType.value,
             status: 'notCalled',
@@ -407,20 +595,27 @@ addBulkContacts.addEventListener('click', async () => {
 
     const contacts = bulkContacts.value.split('\n')
         .map(line => {
-            // Handle tab-separated and colon-separated formats
             const parts = line.includes(':') ? line.split(':') : line.split('\t');
-            return parts.map(item => item.trim());
+            const [name, phone] = parts.map(item => item.trim());
+            return name && phone ? { name, phone: formatPhoneNumber(phone) } : null;
         })
-        .filter(([name, phone]) => name && phone);
+        .filter(contact => contact !== null);
+
+    if (contacts.length === 0) {
+        alert('No valid contacts found');
+        return;
+    }
+
+    const confirmed = await showContactPreview(contacts);
+    if (!confirmed) return;
 
     try {
         const batch = writeBatch(db);
         
-        contacts.forEach(([name, phone]) => {
+        contacts.forEach(contact => {
             const newDocRef = doc(collection(db, 'contacts'));
             batch.set(newDocRef, {
-                name,
-                phone: formatPhoneNumber(phone),
+                ...contact,
                 assignedTo: selectUser.value,
                 workType: workType.value,
                 status: 'notCalled',

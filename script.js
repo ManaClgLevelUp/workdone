@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 import { getFirestore, doc, getDoc, collection } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -83,10 +83,22 @@ onAuthStateChanged(auth, async (user) => {
         try {
             const docRef = doc(db, 'users', user.uid);
             const docSnap = await getDoc(docRef);
-            const userRole = docSnap.data().role;
-            window.location.href = userRole === 'admin' ? 'admin.html' : 'user.html';
+            
+            if (docSnap.exists()) {
+                const userData = docSnap.data();
+                if (userData.role === 'admin') {
+                    window.location.href = 'admin.html';
+                } else if (userData.role === 'user') {
+                    window.location.href = 'user.html';
+                }
+            } else {
+                // Handle case where user document doesn't exist
+                console.log("No user data found");
+                await signOut(auth);
+            }
         } catch (error) {
             console.error("Error checking user role:", error);
+            await signOut(auth);
         }
     }
 });
