@@ -256,7 +256,7 @@ async function deleteUserAndAssociatedData(userId) {
     }
 }
 
-// Replace the createUserForm event listener with this simpler version
+// Replace the createUserForm event listener with this updated version
 createUserForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -275,7 +275,7 @@ createUserForm.addEventListener('submit', async (e) => {
         // Create new user with secondary auth instance
         const userCredential = await createUserWithEmailAndPassword(secondaryAuth, userId.value, userPassword.value);
         
-        // Save user data in Firestore using the main db (admin remains logged in)
+        // Save user data in Firestore using the main db
         await setDoc(doc(db, 'users', userCredential.user.uid), {
             name: userName.value,
             email: userId.value,
@@ -284,13 +284,19 @@ createUserForm.addEventListener('submit', async (e) => {
             createdAt: serverTimestamp()
         });
         
-        // Delete the secondary app so that the admin session remains intact
+        // Delete the secondary app
         await deleteApp(secondaryApp);
 
-        // Clear the form and show success message
+        // Clear form and show success message
         createUserForm.reset();
         alert('User created successfully');
-        loadExistingUsers();
+
+        // Refresh all user lists
+        await Promise.all([
+            loadExistingUsers(),  // Refresh users table
+            loadUsers()           // Refresh select dropdowns
+        ]);
+
     } catch (error) {
         console.error('Error creating user:', error);
         alert('Error creating user: ' + error.message);
@@ -311,43 +317,51 @@ window.deleteUser = async (userId) => {
     }
 };
 
-// Add contact preview functionality
+// Replace just the showContactPreview function
 function showContactPreview(contacts) {
-    const previewHTML = contacts.map(contact => `
-        <div class="contact-preview">
-            <div class="contact-name">${contact.name}</div>
-            <div class="contact-phone">${formatPhoneNumber(contact.phone)}</div>
-        </div>
-    `).join('');
-
-    const previewDialog = document.createElement('div');
-    previewDialog.className = 'preview-dialog';
-    previewDialog.innerHTML = `
-        <div class="preview-content">
-            <h3>Preview Contacts</h3>
-            <div class="preview-list">${previewHTML}</div>
-            <div class="preview-actions">
-                <button class="confirm-btn">Confirm</button>
-                <button class="cancel-btn">Cancel</button>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(previewDialog);
-
     return new Promise((resolve) => {
-        const confirmBtn = previewDialog.querySelector('.confirm-btn');
-        const cancelBtn = previewDialog.querySelector('.cancel-btn');
+        // Remove any existing preview dialogs first
+        const existingDialog = document.querySelector('.preview-dialog');
+        if (existingDialog) {
+            existingDialog.remove();
+        }
 
-        confirmBtn.onclick = () => {
+        const previewHTML = contacts.map(contact => `
+            <div class="contact-preview">
+                <div class="contact-name">${contact.name}</div>
+                <div class="contact-phone">${formatPhoneNumber(contact.phone)}</div>
+            </div>
+        `).join('');
+
+        const previewDialog = document.createElement('div');
+        previewDialog.className = 'preview-dialog';
+        previewDialog.innerHTML = `
+            <div class="preview-content">
+                <h3>Preview Contacts</h3>
+                <div class="preview-list">${previewHTML}</div>
+                <div class="preview-actions">
+                    <button class="confirm-btn">Confirm</button>
+                    <button class="cancel-btn">Cancel</button>
+                </div>
+            </div>
+        `;
+
+        // Create one-time event handlers
+        const handleConfirm = () => {
             previewDialog.remove();
             resolve(true);
         };
 
-        cancelBtn.onclick = () => {
+        const handleCancel = () => {
             previewDialog.remove();
             resolve(false);
         };
+
+        document.body.appendChild(previewDialog);
+
+        // Add event listeners with { once: true }
+        previewDialog.querySelector('.confirm-btn').addEventListener('click', handleConfirm, { once: true });
+        previewDialog.querySelector('.cancel-btn').addEventListener('click', handleCancel, { once: true });
     });
 }
 
