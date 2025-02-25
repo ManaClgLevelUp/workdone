@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, query, where, onSnapshot, updateDoc, serverTimestamp, addDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, query, where, onSnapshot, updateDoc, serverTimestamp, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCve0_yChnzGgaSBtKh-yKvGopGo3psBQ8",
@@ -145,6 +145,51 @@ async function handleBeforeUnload(event) {
     await logPageVisit('closed');
 }
 
+// Add this new function to get status counts
+async function getStatusCounts(userId, workType) {
+    const contactsRef = collection(db, 'contacts');
+    const q = query(contactsRef, 
+        where('assignedTo', '==', userId),
+        where('workType', '==', workType)
+    );
+    
+    const snapshot = await getDocs(q);
+    const counts = {
+        notCalled: 0,
+        answered: 0,
+        notAnswered: 0,
+        notInterested: 0
+    };
+    
+    snapshot.docs.forEach(doc => {
+        const status = doc.data().status;
+        if (counts.hasOwnProperty(status)) {
+            counts[status]++;
+        }
+    });
+    
+    return counts;
+}
+
+// Add this function to update the status filter counts
+async function updateStatusFilterCounts(userId, workType) {
+    const statusHeaderFilter = document.getElementById('statusHeaderFilter');
+    if (!statusHeaderFilter) return;
+
+    const counts = await getStatusCounts(userId, workType);
+    
+    Array.from(statusHeaderFilter.options).forEach(option => {
+        const status = option.value;
+        if (status) {
+            const count = counts[status] || 0;
+            option.textContent = `${status === 'notCalled' ? 'Not Called' : 
+                                 status === 'notAnswered' ? 'Not Answered' : 
+                                 status === 'notInterested' ? 'Not Interested' : 
+                                 'Answered'} (${count})`;
+        }
+    });
+}
+
 // Logout Handler
 logoutBtn.addEventListener('click', async () => {
     await logPageVisit('closed');
@@ -196,21 +241,33 @@ function formatPhoneNumber(phone) {
     return phone; // Return original if format is unknown
 }
 
-// Load Contacts
+// Modify the loadContacts function
 async function loadContacts(workType) {
     if (!currentUser) return;
 
-    let q = query(
+    let baseQuery = query(
         collection(db, 'contacts'),
         where('assignedTo', '==', currentUser.uid),
         where('workType', '==', workType)
     );
 
-    if (statusFilter.value) {
-        q = query(q, where('status', '==', statusFilter.value));
+    const statusHeaderFilter = document.getElementById('statusHeaderFilter');
+    let finalQuery = baseQuery;
+
+    if (statusHeaderFilter && statusHeaderFilter.value) {
+        finalQuery = query(
+            collection(db, 'contacts'),
+            where('assignedTo', '==', currentUser.uid),
+            where('workType', '==', workType),
+            where('status', '==', statusHeaderFilter.value)
+        );
     }
 
-    onSnapshot(q, (snapshot) => {
+    // Update counts first
+    await updateStatusFilterCounts(currentUser.uid, workType);
+
+    // Then load filtered contacts
+    onSnapshot(finalQuery, (snapshot) => {
         const html = snapshot.docs.map(doc => {
             const data = doc.data();
             const formattedPhone = formatPhoneNumber(data.phone);
@@ -311,10 +368,15 @@ window.handleNotesInput = debounce(async (textarea, contactId) => {
     }
 }, 500); // Wait 500ms after user stops typing before saving
 
-// Status Filter Handler
-statusFilter.addEventListener('change', () => {
-    const activeWorkType = document.querySelector('.type-btn.active').dataset.type;
-    loadContacts(activeWorkType);
+// Add status filter change handler after DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    const statusHeaderFilter = document.getElementById('statusHeaderFilter');
+    if (statusHeaderFilter) {
+        statusHeaderFilter.addEventListener('change', () => {
+            const activeWorkType = document.querySelector('.type-btn.active').dataset.type;
+            loadContacts(activeWorkType);
+        });
+    }
 });
 
 // Add pull-to-refresh functionality

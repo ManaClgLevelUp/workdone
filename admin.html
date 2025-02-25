@@ -124,7 +124,7 @@
                         <option value="students">Registered Students</option>
                         <option value="sales">Sales Numbers</option>
                     </select>
-                    <input type="date" id="activityDate">
+                    <input type="date" id="activityDate" title="Select date to view activity">
                 </div>
 
                 <div id="userActivityInfo" class="user-activity-info">
@@ -184,7 +184,15 @@
                             <tr>
                                 <th>Contact Details</th>
                                 <th>Actions</th>
-                                <th>Status</th>
+                                <th>
+                                    <select id="statusHeaderFilter" class="status-header-filter">
+                                        <option value="">All Status</option>
+                                        <option value="notCalled">Not Called (0)</option>
+                                        <option value="answered">Answered (0)</option>
+                                        <option value="notAnswered">Not Answered (0)</option>
+                                        <option value="notInterested">Not Interested (0)</option>
+                                    </select>
+                                </th>
                                 <th>Notes</th>
                                 <th>Last Updated</th>
                                 <th>Manage</th>

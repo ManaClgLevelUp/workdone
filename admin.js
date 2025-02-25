@@ -44,6 +44,15 @@ const db = getFirestore(app);
 
 let currentUser = null;
 
+// Add these functions at the start of your code
+function saveActiveSection(sectionId) {
+    localStorage.setItem('activeSection', sectionId);
+}
+
+function loadActiveSection() {
+    return localStorage.getItem('activeSection') || 'createUser'; // default to createUser if none saved
+}
+
 // DOM Elements
 const adminName = document.getElementById('adminName');
 const logoutBtn = document.getElementById('logoutBtn');
@@ -187,10 +196,25 @@ onAuthStateChanged(auth, async (user) => {
         if (userDoc.exists() && userDoc.data().role === 'admin') {
             currentUser = user;
             adminName.textContent = userDoc.data().name || 'Admin';
-            loadUsers();
-            loadExistingUsers(); // Add this line
-            initTheme(); // Initialize theme
-            initMobileMenu(); // Initialize mobile menu after DOM is ready
+            
+            // Restore active section immediately before loading data
+            const activeSection = loadActiveSection();
+            const activeBtn = document.querySelector(`.nav-btn[data-section="${activeSection}"]`);
+            if (activeBtn) {
+                navBtns.forEach(b => b.classList.remove('active'));
+                sections.forEach(s => s.classList.remove('active'));
+                activeBtn.classList.add('active');
+                document.getElementById(activeSection).classList.add('active');
+            }
+
+            // Then load all data asynchronously
+            initTheme();
+            initMobileMenu();
+            await Promise.all([
+                loadUsers(),
+                loadExistingUsers()
+            ]);
+
         } else {
             window.location.href = 'index.html';
         }
@@ -207,6 +231,7 @@ navBtns.forEach(btn => {
         sections.forEach(s => s.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById(targetSection).classList.add('active');
+        saveActiveSection(targetSection); // Save the active section
     });
 });
 
@@ -801,12 +826,56 @@ document.getElementById('activityDate').addEventListener('change', (e) => {
 });
 
 // Update setupProgressListener function
+async function getStatusCounts(userId, workType) {
+    const contactsRef = collection(db, 'contacts');
+    const q = query(contactsRef, 
+        where('assignedTo', '==', userId),
+        where('workType', '==', workType)
+    );
+    
+    const snapshot = await getDocs(q);
+    const counts = {
+        notCalled: 0,
+        answered: 0,
+        notAnswered: 0,
+        notInterested: 0
+    };
+    
+    snapshot.docs.forEach(doc => {
+        const status = doc.data().status;
+        if (counts.hasOwnProperty(status)) {
+            counts[status]++;
+        }
+    });
+    
+    return counts;
+}
+
+// Fix the updateStatusHeaderCounts function
+async function updateStatusHeaderCounts(userId, workType) {
+    const statusFilter = document.getElementById('statusHeaderFilter');
+    if (!statusFilter) return;
+
+    const counts = await getStatusCounts(userId, workType);
+    
+    // Update dropdown options with counts
+    Array.from(statusFilter.options).forEach(option => {
+        const status = option.value;
+        if (status) {
+            const count = counts[status] || 0; // Get count for this status
+            option.textContent = `${status === 'notCalled' ? 'Not Called' : 
+                                 status === 'notAnswered' ? 'Not Answered' : 
+                                 status === 'notInterested' ? 'Not Interested' : 
+                                 'Answered'} (${count})`;
+        }
+    });
+}
+
 function setupProgressListener() {
     if (progressUnsubscribe) {
         progressUnsubscribe();
     }
     if (pageVisitsUnsubscribe) {
-        pageVisitsUnsubscribe();
         pageVisitsUnsubscribe = null;
     }
 
@@ -814,44 +883,35 @@ function setupProgressListener() {
     document.getElementById('activityDate').value = today;
 
     if (!progressUser.value) {
-        document.getElementById('userContactInfo').innerHTML = '';
-        progressData.innerHTML = '';
-        resetActivityDisplay();
-        document.getElementById('visitsLog').innerHTML = '';
-        document.getElementById('activityLog').innerHTML = '';
+        // Clear all displays safely
+        const userContactInfo = document.getElementById('userContactInfo');
+        if (userContactInfo) userContactInfo.innerHTML = '';
+        if (progressData) progressData.innerHTML = '';
+        
+        resetActivityDisplay();  // Now safe to call with null checks
+        
+        const visitsLog = document.getElementById('visitsLog');
+        const activityLog = document.getElementById('activityLog');
+        
+        if (visitsLog) visitsLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
+        if (activityLog) activityLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
         return;
     }
 
-    const q = query(collection(db, 'contacts'), 
+    // Create base query
+    let baseQuery = query(collection(db, 'contacts'), 
         where('assignedTo', '==', progressUser.value),
         where('workType', '==', progressWorkType.value));
 
-    progressUnsubscribe = onSnapshot(q, async (snapshot) => {
-        // Get user details for contact
-        const userDoc = await getDoc(doc(db, 'users', progressUser.value));
-        const userData = userDoc.data();
+    const statusHeaderFilter = document.getElementById('statusHeaderFilter');
+    
+    // Function to update contacts list with filtered data
+    async function updateContactsList(filterQuery) {
+        const snapshot = await getDocs(filterQuery);
+        const userData = (await getDoc(doc(db, 'users', progressUser.value))).data();
+        const statusCounts = await getStatusCounts(progressUser.value, progressWorkType.value);
         
-        // Update user contact info
-        document.getElementById('userContactInfo').innerHTML = `
-            <div class="user-contact-row">
-                <div class="user-contact-info">
-                    <div>
-                        <strong>${userData.name}</strong>
-                        <div class="user-phone">${userData.phone || 'No phone'}</div>
-                    </div>
-                    <div class="user-contact-actions">
-                        <button class="action-btn call-btn" onclick="window.adminMakeCall('${progressUser.value}', '${userData.phone}')">
-                            <i class="fas fa-phone"></i>
-                        </button>
-                        <button class="action-btn whatsapp-btn" onclick="window.adminSendWhatsApp('${progressUser.value}', '${userData.phone}')">
-                            <i class="fab fa-whatsapp"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Update contacts list with inline editing
+        // Update contact list HTML with full contact row template
         progressData.innerHTML = snapshot.docs.map(doc => {
             const data = doc.data();
             return `
@@ -885,8 +945,7 @@ function setupProgressListener() {
                         </select>
                     </td>
                     <td>
-                        <textarea class="notes-textarea" readonly
-                                placeholder="Add notes...">${data.notes || ''}</textarea>
+                        <textarea class="notes-textarea" readonly placeholder="Add notes...">${data.notes || ''}</textarea>
                     </td>
                     <td>${data.lastUpdated ? new Date(data.lastUpdated.toDate()).toLocaleString() : '-'}</td>
                     <td>
@@ -905,12 +964,39 @@ function setupProgressListener() {
                 </tr>
             `;
         }).join('');
+
+        // Update status counts in header
+        await updateStatusHeaderCounts(progressUser.value, progressWorkType.value);
+    }
+
+    // Add status filter change handler
+    if (statusHeaderFilter) {
+        statusHeaderFilter.addEventListener('change', async () => {
+            const selectedStatus = statusHeaderFilter.value;
+            let filteredQuery;
+            
+            if (selectedStatus) {
+                filteredQuery = query(collection(db, 'contacts'),
+                    where('assignedTo', '==', progressUser.value),
+                    where('workType', '==', progressWorkType.value),
+                    where('status', '==', selectedStatus)
+                );
+            } else {
+                filteredQuery = baseQuery;
+            }
+
+            // Update the contacts list with filtered data
+            await updateContactsList(filteredQuery);
+        });
+    }
+
+    // Set up real-time listener for initial/unfiltered data
+    progressUnsubscribe = onSnapshot(baseQuery, async () => {
+        await updateContactsList(baseQuery);
     });
 
-    // Add activity loading
+    // Load activities and page visits
     loadUserActivities(progressUser.value, today);
-
-    // Load page visits for today by default
     loadUserPageVisits(progressUser.value, today);
 }
 
@@ -1142,12 +1228,14 @@ function formatDuration(ms) {
     return `${seconds}s`;
 }
 
+// 1. Update the resetActivityDisplay function to check for null elements
 function resetActivityDisplay() {
-    firstLogin.textContent = '-';
-    lastLogout.textContent = '-';
-    totalDuration.textContent = '-';
-    sessionCount.textContent = '-';
-    activityTimeline.innerHTML = '';
+    // Add null checks for each element
+    if (firstLogin) firstLogin.textContent = '-';
+    if (lastLogout) lastLogout.textContent = '-';
+    if (totalDuration) totalDuration.textContent = '-';
+    if (sessionCount) sessionCount.textContent = '-';
+    if (activityTimeline) activityTimeline.innerHTML = '';
 }
 
 // Update the timestamp calculation functions

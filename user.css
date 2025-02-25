@@ -247,6 +247,37 @@ th {
     background: #f9f9f9;
 }
 
+.status-header-filter {
+    width: 100%;
+    padding: 0.5rem;
+    border: none;
+    background-color: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: inherit;
+}
+
+.status-header-filter:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.status-header-filter option {
+    background-color: var(--surface-color);
+    color: var(--text-primary);
+    padding: 8px;
+}
+
+/* Dark mode support */
+[data-theme="dark"] .status-header-filter {
+    background-color: var(--surface-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .status-header-filter option {
+    background-color: var(--surface-color);
+    color: var(--text-primary);
+}
 
 .theme-toggle {
     padding: 0.5rem;
