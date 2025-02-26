@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCve0_yChnzGgaSBtKh-yKvGopGo3psBQ8",
@@ -44,7 +44,7 @@ togglePassword.addEventListener('click', () => {
     }
 });
 
-// Login form submission
+// Update login form submission
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -52,28 +52,43 @@ loginForm.addEventListener('submit', async (e) => {
     const password = document.getElementById('password').value;
 
     try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-
-        // Get user role from Firebase
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const userRole = userDoc.data().role;
-
-        // Verify selected role matches user's actual role
-        if (userRole !== selectedRole) {
-            alert('Invalid role selected. Please choose the correct role.');
+        // First verify if user exists and get their role
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('email', '==', email));
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+            alert('User not found');
             return;
         }
 
+        // Get user data and check role before login
+        const userData = querySnapshot.docs[0].data();
+        if (userData.role !== selectedRole) {
+            alert(`Please select the correct role. You are a ${userData.role}.`);
+            return;
+        }
+
+        // If role matches, proceed with login
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
         // Redirect based on role
-        if (userRole === 'admin') {
+        if (userData.role === 'admin') {
             window.location.href = 'admin.html';
         } else {
             window.location.href = 'user.html';
         }
 
     } catch (error) {
-        alert('Login failed: ' + error.message);
+        console.error('Login error:', error);
+        if (error.code === 'auth/wrong-password') {
+            alert('Invalid password');
+        } else if (error.code === 'auth/user-not-found') {
+            alert('User not found');
+        } else {
+            alert('Login failed: ' + error.message);
+        }
     }
 });
 

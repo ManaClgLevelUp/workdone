@@ -272,7 +272,7 @@ async function loadContacts(workType) {
             const data = doc.data();
             const formattedPhone = formatPhoneNumber(data.phone);
             return `
-                <div class="contact-card">
+                <div class="contact-card" data-id="${doc.id}">
                     <div class="contact-info">
                         <div class="contact-name">${data.name}</div>
                         <div class="contact-phone">${formattedPhone}</div>
@@ -291,6 +291,8 @@ async function loadContacts(workType) {
                         <textarea class="notes-textarea" 
                                 placeholder="Add notes here..."
                                 oninput="window.handleNotesInput(this, '${doc.id}')"
+                                onfocus="this.readOnly = false"
+                                onblur="this.readOnly = true"
                                 >${data.notes || ''}</textarea>
                     </div>
                     
@@ -347,16 +349,23 @@ window.updateNotes = async (contactId, notes) => {
 
 window.updateStatus = async (contactId, newStatus) => {
     try {
+        const contactCard = document.querySelector(`.contact-card[data-id="${contactId}"]`);
+        
         await updateDoc(doc(db, 'contacts', contactId), {
             status: newStatus,
             lastUpdated: serverTimestamp()
         });
+
+        // Refresh the status counts after updating
+        const activeWorkType = document.querySelector('.type-btn.active').dataset.type;
+        await updateStatusFilterCounts(currentUser.uid, activeWorkType);
+
     } catch (error) {
         alert('Error updating status: ' + error.message);
     }
 };
 
-// Add debounced notes update handler
+// Update debounce time from 2000 to 10000 milliseconds
 window.handleNotesInput = debounce(async (textarea, contactId) => {
     try {
         await updateDoc(doc(db, 'contacts', contactId), {
@@ -366,7 +375,7 @@ window.handleNotesInput = debounce(async (textarea, contactId) => {
     } catch (error) {
         alert('Error saving notes: ' + error.message);
     }
-}, 500); // Wait 500ms after user stops typing before saving
+}, 10000); // Changed to 10 seconds
 
 // Add status filter change handler after DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
