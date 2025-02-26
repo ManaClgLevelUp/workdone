@@ -38,32 +38,42 @@ let currentContactId = null;
 // Add this after Firebase initialization
 let lastVisitDoc = null;
 
-async function logPageVisit(action) {
+// Replace the old logPageVisit function with this new version
+let currentVisit = null;
+
+async function logPageVisit(type) {
     if (!currentUserId) return;
     
     try {
         const today = new Date().toISOString().split('T')[0];
-        const currentTimestamp = new Date(); // Get current time
+        const timestamp = serverTimestamp();  // Change to serverTimestamp
 
-        if (action === 'opened') {
-            const visitDoc = await addDoc(collection(db, 'pageVisits'), {
+        if (type === 'opened') {
+            // Store start time in memory and in database
+            const docRef = await addDoc(collection(db, 'pageVisits'), {
                 userId: currentUserId,
-                action: 'opened',
-                timestamp: currentTimestamp, // Use actual Date object
-                serverTime: serverTimestamp(), // Keep server timestamp for consistency
-                date: today
-            });
-            lastVisitDoc = visitDoc;
-        } else if (action === 'closed' && lastVisitDoc) {
-            await addDoc(collection(db, 'pageVisits'), {
-                userId: currentUserId,
-                action: 'closed',
-                timestamp: currentTimestamp, // Use actual Date object
-                serverTime: serverTimestamp(), // Keep server timestamp for consistency
                 date: today,
-                openedDocId: lastVisitDoc.id
+                openTime: timestamp,
+                serverTime: timestamp,
+                status: 'open'
             });
-            lastVisitDoc = null;
+            currentVisit = {
+                docId: docRef.id,
+                startTime: new Date()  // Store local time for duration calculation
+            };
+        } else if (type === 'closed' && currentVisit) {
+            // Calculate duration using local time for accuracy
+            const endTime = new Date();
+            const duration = endTime - currentVisit.startTime;
+            
+            // Update the existing document with close time and duration
+            await updateDoc(doc(db, 'pageVisits', currentVisit.docId), {
+                closeTime: timestamp,
+                duration: duration,
+                status: 'closed'
+            });
+
+            currentVisit = null;
         }
     } catch (error) {
         console.error('Error logging page visit:', error);
@@ -80,13 +90,11 @@ onAuthStateChanged(auth, async (user) => {
             currentUserId = user.uid;
             userName.textContent = userDoc.data().name || 'User';
             
-            // Log page open
+            // Start page visit tracking
             await logPageVisit('opened');
 
-            // Add page visibility change detection
+            // Add event listeners for page state changes
             document.addEventListener('visibilitychange', handleVisibilityChange);
-            
-            // Add beforeunload event listener
             window.addEventListener('beforeunload', handleBeforeUnload);
 
             loadContacts('students'); // Default work type
@@ -135,14 +143,20 @@ onAuthStateChanged(auth, async (user) => {
 // Add these new functions
 async function handleVisibilityChange() {
     if (document.visibilityState === 'hidden') {
-        await logPageVisit('closed');
+        if (currentVisit) {
+            await logPageVisit('closed');
+        }
     } else if (document.visibilityState === 'visible') {
-        await logPageVisit('opened');
+        if (!currentVisit) {
+            await logPageVisit('opened');
+        }
     }
 }
 
 async function handleBeforeUnload(event) {
-    await logPageVisit('closed');
+    if (currentVisit) {
+        await logPageVisit('closed');
+    }
 }
 
 // Add this new function to get status counts

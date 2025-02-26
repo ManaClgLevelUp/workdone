@@ -43,6 +43,8 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let currentUser = null;
+let progressUnsubscribe = null;
+let pageVisitsUnsubscribe = null;  // Add this line
 
 // Add these functions at the start of your code
 function saveActiveSection(sectionId) {
@@ -671,8 +673,6 @@ addBulkContacts.addEventListener('click', async () => {
 });
 
 // Progress Monitoring
-let progressUnsubscribe = null;
-
 progressUser.addEventListener('change', setupProgressListener);
 progressWorkType.addEventListener('change', setupProgressListener);
 
@@ -707,14 +707,11 @@ function formatLogTime(timestamp) {
 }
 
 // Update loadUserPageVisits function
-let pageVisitsUnsubscribe = null;
-
 async function loadUserPageVisits(userId, date) {
     const visitsLog = document.getElementById('visitsLog');
     const totalTimeToday = document.getElementById('totalTimeToday');
     const pageOpens = document.getElementById('pageOpens');
 
-    // Clear previous listener
     if (pageVisitsUnsubscribe) {
         pageVisitsUnsubscribe();
         pageVisitsUnsubscribe = null;
@@ -730,85 +727,47 @@ async function loadUserPageVisits(userId, date) {
             collection(db, 'pageVisits'),
             where('userId', '==', userId),
             where('date', '==', date),
-            orderBy('serverTime', 'desc') // Use serverTime for ordering
+            orderBy('serverTime', 'desc')
         );
 
         pageVisitsUnsubscribe = onSnapshot(q, (snapshot) => {
-            let visits = [];
             let totalDuration = 0;
-            let openCount = 0;
-            const openedVisits = new Map();
-
-            // First pass: collect all opened visits
-            snapshot.docs.forEach(doc => {
+            let totalVisits = 0;
+            
+            // Generate HTML for visits
+            const html = snapshot.docs.map(doc => {
                 const data = doc.data();
-                if (data.action === 'opened') {
-                    openedVisits.set(doc.id, {
-                        openTime: data.timestamp,
-                        serverTime: data.serverTime,
-                        id: doc.id
-                    });
+                // Add to totals if valid duration exists
+                if (data.duration) {
+                    totalDuration += data.duration;
+                    totalVisits++;
                 }
-            });
 
-            // Second pass: match closed visits with opened ones
-            snapshot.docs.forEach(doc => {
-                const data = doc.data();
-                if (data.action === 'closed' && data.openedDocId) {
-                    const openedVisit = openedVisits.get(data.openedDocId);
-                    if (openedVisit) {
-                        const duration = calculateDuration(openedVisit.openTime, data.timestamp);
-                        if (duration > 0) {
-                            visits.push({
-                                openTime: openedVisit.openTime,
-                                closeTime: data.timestamp,
-                                duration: duration,
-                                serverTime: data.serverTime // Keep for sorting
-                            });
-                            totalDuration += duration;
-                            openCount++;
-                        }
-                    }
+                const openTime = data.openTime;
+                const closeTime = data.closeTime;
+                const duration = data.duration || 0;
+
+                // Only show visits that have complete data
+                if (openTime && closeTime && duration) {
+                    return `
+                        <tr>
+                            <td>${formatLogTime(openTime)}</td>
+                            <td>${formatLogTime(closeTime)}</td>
+                            <td>${formatDuration(duration)}</td>
+                        </tr>
+                    `;
                 }
-            });
+                return '';
+            }).filter(row => row !== '').join('');
 
-            // Sort visits by server timestamp for consistency
-            visits.sort((a, b) => b.serverTime.toMillis() - a.serverTime.toMillis());
-
-            // Generate HTML with visibility classes
-            const html = visits.map((visit, index) => `
-                <tr class="${index < 5 ? 'visible' : 'hidden'}" style="animation-delay: ${index * 0.1}s">
-                    <td>${formatLogTime(visit.openTime)}</td>
-                    <td>${formatLogTime(visit.closeTime)}</td>
-                    <td>${formatDuration(visit.duration)}</td>
-                </tr>
-            `).join('');
-
+            // Update the display
             visitsLog.innerHTML = html || '<tr><td colspan="3">No visits recorded for this date</td></tr>';
             totalTimeToday.textContent = formatDuration(totalDuration);
-            pageOpens.textContent = openCount;
-
-            // Set up infinite scroll
-            if (visits.length > 5) {
-                const tableContainer = visitsLog.closest('.log-table-container');
-                tableContainer.onscroll = () => {
-                    if (tableContainer.scrollTop + tableContainer.clientHeight >= tableContainer.scrollHeight - 20) {
-                        const hiddenRows = visitsLog.querySelectorAll('tr.hidden');
-                        hiddenRows.forEach((row, index) => {
-                            if (index < 5) {
-                                row.classList.replace('hidden', 'visible');
-                            }
-                        });
-                    }
-                };
-            }
-        }, (error) => {
-            console.error('Error in page visits subscription:', error);
-            visitsLog.innerHTML = '<tr><td colspan="3">Error loading data</td></tr>';
+            pageOpens.textContent = totalVisits;
         });
 
     } catch (error) {
-        console.error('Error setting up page visits:', error);
+        console.error('Error loading page visits:', error);
         visitsLog.innerHTML = '<tr><td colspan="3">Error loading data</td></tr>';
     }
 }
@@ -872,31 +831,25 @@ async function updateStatusHeaderCounts(userId, workType) {
 }
 
 function setupProgressListener() {
+    // Clear existing listeners
     if (progressUnsubscribe) {
         progressUnsubscribe();
     }
     if (pageVisitsUnsubscribe) {
-        pageVisitsUnsubscribe = null;
+        pageVisitsUnsubscribe();
     }
 
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('activityDate').value = today;
 
     if (!progressUser.value) {
-        // Clear all displays safely
-        const userContactInfo = document.getElementById('userContactInfo');
-        if (userContactInfo) userContactInfo.innerHTML = '';
-        if (progressData) progressData.innerHTML = '';
-        
-        resetActivityDisplay();  // Now safe to call with null checks
-        
-        const visitsLog = document.getElementById('visitsLog');
-        const activityLog = document.getElementById('activityLog');
-        
-        if (visitsLog) visitsLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
-        if (activityLog) activityLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
+        resetAllDisplays();
         return;
     }
+
+    // Load both activities and visits
+    loadUserActivities(progressUser.value, today);
+    loadUserPageVisits(progressUser.value, today);
 
     // Create base query
     let baseQuery = query(collection(db, 'contacts'), 
@@ -1286,4 +1239,24 @@ function initMobileMenu() {
             }
         });
     });
+}
+
+// Add this helper function
+function resetAllDisplays() {
+    const displays = {
+        userContactInfo: document.getElementById('userContactInfo'),
+        progressData: document.getElementById('progressData'),
+        visitsLog: document.getElementById('visitsLog'),
+        activityLog: document.getElementById('activityLog'),
+        totalTimeToday: document.getElementById('totalTimeToday'),
+        pageOpens: document.getElementById('pageOpens')
+    };
+
+    // Clear all displays safely
+    if (displays.userContactInfo) displays.userContactInfo.innerHTML = '';
+    if (displays.progressData) displays.progressData.innerHTML = '';
+    if (displays.visitsLog) displays.visitsLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
+    if (displays.activityLog) displays.activityLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
+    if (displays.totalTimeToday) displays.totalTimeToday.textContent = '-';
+    if (displays.pageOpens) displays.pageOpens.textContent = '0';
 }
