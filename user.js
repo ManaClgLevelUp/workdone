@@ -241,34 +241,33 @@ function formatPhoneNumber(phone) {
     return phone; // Return original if format is unknown
 }
 
-// Modify the loadContacts function
+// Update the loadContacts function with real-time filtering
 async function loadContacts(workType) {
     if (!currentUser) return;
 
+    // Create base query
     let baseQuery = query(
         collection(db, 'contacts'),
         where('assignedTo', '==', currentUser.uid),
         where('workType', '==', workType)
     );
 
-    const statusHeaderFilter = document.getElementById('statusHeaderFilter');
-    let finalQuery = baseQuery;
+    // Set up real-time listener
+    const unsubscribe = onSnapshot(baseQuery, async (snapshot) => {
+        // Get current filter value
+        const statusHeaderFilter = document.getElementById('statusHeaderFilter');
+        const selectedStatus = statusHeaderFilter ? statusHeaderFilter.value : '';
+        
+        // Filter docs based on selected status
+        const filteredDocs = selectedStatus ? 
+            snapshot.docs.filter(doc => doc.data().status === selectedStatus) :
+            snapshot.docs;
 
-    if (statusHeaderFilter && statusHeaderFilter.value) {
-        finalQuery = query(
-            collection(db, 'contacts'),
-            where('assignedTo', '==', currentUser.uid),
-            where('workType', '==', workType),
-            where('status', '==', statusHeaderFilter.value)
-        );
-    }
+        // Update the counts first
+        await updateStatusFilterCounts(currentUser.uid, workType);
 
-    // Update counts first
-    await updateStatusFilterCounts(currentUser.uid, workType);
-
-    // Then load filtered contacts
-    onSnapshot(finalQuery, (snapshot) => {
-        const html = snapshot.docs.map(doc => {
+        // Generate HTML for filtered contacts
+        const html = filteredDocs.map(doc => {
             const data = doc.data();
             const formattedPhone = formatPhoneNumber(data.phone);
             return `
@@ -311,8 +310,14 @@ async function loadContacts(workType) {
                 </div>
             `;
         }).join('');
-        contactsData.innerHTML = html;
+        contactsData.innerHTML = html || '<div class="no-contacts">No contacts found</div>';
     });
+
+    // Store the unsubscribe function
+    if (window.currentUnsubscribe) {
+        window.currentUnsubscribe();
+    }
+    window.currentUnsubscribe = unsubscribe;
 }
 
 // Make functions available to window object for inline event handlers
