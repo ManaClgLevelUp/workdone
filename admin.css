@@ -102,6 +102,14 @@ header {
     overflow-y: auto;
 }
 
+.sidebar-header {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: center;
+}
+
 .nav-btn {
     padding: 1rem;
     border: none;
@@ -937,6 +945,16 @@ tr:hover {
     .contact-card {
         width: 100%;
     }
+
+    .sidebar-header {
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .theme-toggle {
+        width: 36px;
+        height: 36px;
+    }
 }
 
 /* Add overlay for mobile menu */
@@ -973,6 +991,25 @@ tr:hover {
 
 .theme-toggle:hover {
     background: rgba(255,255,255,0.1);
+}
+
+.theme-toggle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--sidebar-text);
+    background: transparent;
+    color: var(--sidebar-text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.theme-toggle:hover {
+    background-color: var(--sidebar-text);
+    color: var(--sidebar-bg);
 }
 
 /* Dark mode specific adjustments */
