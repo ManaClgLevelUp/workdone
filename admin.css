@@ -1187,5 +1187,64 @@ tr:hover {
 .status-header-filter option {
     background-color: var(--surface-color);
     color: var(--text-primary);
-    padding: 8px;
+}
+
+/* Progress View Toggle Styles */
+.progress-view-toggle {
+    display: flex;
+    gap: 1rem;
+    margin: 1rem 0;
+    background: var(--surface-color);
+    padding: 0.8rem;
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
+}
+
+.progress-toggle-btn {
+    padding: 0.8rem 1.5rem;
+    border: 2px solid var(--primary-color);
+    background: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    flex: 1;
+    text-align: center;
+}
+
+.progress-toggle-btn.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+.progress-sections {
+    position: relative;
+    margin-top: 1rem;
+}
+
+.progress-section {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.progress-section.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .progress-view-toggle {
+    background: var(--surface-color);
+}
+
+[data-theme="dark"] .progress-toggle-btn {
+    border-color: var(--primary-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .progress-toggle-btn.active {
+    background: var(--primary-color);
+    color: var(--header-text);
 }

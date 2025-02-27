@@ -130,80 +130,98 @@
                     <input type="date" id="activityDate" title="Select date to view activity">
                 </div>
 
-                <div id="userActivityInfo" class="user-activity-info">
-                    <div class="view-toggle">
-                        <button class="toggle-btn active" data-view="summary">Active Summary</button>
-                        <button class="toggle-btn" data-view="visits">Page Visit Log</button>
+                <!-- Add Progress View Toggle -->
+                <div class="progress-view-toggle">
+                    <button class="progress-toggle-btn active" data-view="userProgress">User Progress</button>
+                    <button class="progress-toggle-btn" data-view="userActivity">User Activity</button>
+                </div>
+
+                <!-- Add Progress Sections Container -->
+                <div class="progress-sections">
+                    <!-- User Progress Section -->
+                    <div id="userProgressSection" class="progress-section active">
+                        <div class="progress-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Contact Details</th>
+                                        <th>Actions</th>
+                                        <th>
+                                            <select id="statusHeaderFilter" class="status-header-filter">
+                                                <option value="">All Status</option>
+                                                <option value="notCalled">Not Called (0)</option>
+                                                <option value="answered">Answered (0)</option>
+                                                <option value="notAnswered">Not Answered (0)</option>
+                                                <option value="notInterested">Not Interested (0)</option>
+                                            </select>
+                                        </th>
+                                        <th>Notes</th>
+                                        <th>Last Updated</th>
+                                        <th>Manage</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="progressData"></tbody>
+                            </table>
+                        </div>
                     </div>
 
-                    <div class="view-sections">
-                        <div id="activitySummary" class="view-section active">
-                            <div class="log-table-container">
-                                <table class="log-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Time</th>
-                                            <th>Type</th>
-                                            <th>Duration</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="activityLog"></tbody>
-                                </table>
+                    <!-- User Activity Section -->
+                    <div id="userActivitySection" class="progress-section">
+                        <div id="userActivityInfo" class="user-activity-info">
+                            <div class="view-toggle">
+                                <button class="toggle-btn active" data-view="summary">Active Summary</button>
+                                <button class="toggle-btn" data-view="visits">Page Visit Log</button>
+                            </div>
+
+                            <div class="view-sections">
+                                <div id="activitySummary" class="view-section active">
+                                    <div class="log-table-container">
+                                        <table class="log-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Time</th>
+                                                    <th>Type</th>
+                                                    <th>Duration</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="activityLog"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div id="pageVisitLog" class="view-section">
+                                    <div class="log-table-container">
+                                        <table class="log-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Opened Time</th>
+                                                    <th>Closed Time</th>
+                                                    <th>Duration</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="visitsLog"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <div id="pageVisitLog" class="view-section">
-                            <div class="log-table-container">
-                                <table class="log-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Opened Time</th>
-                                            <th>Closed Time</th>
-                                            <th>Duration</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="visitsLog"></tbody>
-                                </table>
+                        <div class="activity-stats">
+                            <div class="stat-item">
+                                <label>Total Active Time:</label>
+                                <span id="totalTimeToday">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <label>Page Opens:</label>
+                                <span id="pageOpens">-</span>
                             </div>
                         </div>
                     </div>
                 </div>
+            </section>
 
-                <div class="activity-stats">
-                    <div class="stat-item">
-                        <label>Total Active Time:</label>
-                        <span id="totalTimeToday">-</span>
-                    </div>
-                    <div class="stat-item">
-                        <label>Page Opens:</label>
-                        <span id="pageOpens">-</span>
-                    </div>
-                </div>
-
-                <div id="userContactInfo"></div>
-                <div class="progress-table">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Contact Details</th>
-                                <th>Actions</th>
-                                <th>
-                                    <select id="statusHeaderFilter" class="status-header-filter">
-                                        <option value="">All Status</option>
-                                        <option value="notCalled">Not Called (0)</option>
-                                        <option value="answered">Answered (0)</option>
-                                        <option value="notAnswered">Not Answered (0)</option>
-                                        <option value="notInterested">Not Interested (0)</option>
-                                    </select>
-                                </th>
-                                <th>Notes</th>
-                                <th>Last Updated</th>
-                                <th>Manage</th>
-                            </tr>
-                        </thead>
-                        <tbody id="progressData"></tbody>
-                    </table>
-                </div>
+            <section id="progress" class="section">
+                <!-- The content will be dynamically inserted by setupProgressViews() -->
             </section>
         </main>
     </div>

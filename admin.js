@@ -190,6 +190,24 @@ if (menuToggle && sidebar && sidebarOverlay) {
     });
 }
 
+// Add this after DOM Elements section
+const progressToggleBtns = document.querySelectorAll('.progress-toggle-btn');
+const progressSections = document.querySelectorAll('.progress-section');
+
+// Add this to your initialization code
+progressToggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        // Remove active class from all buttons and sections
+        progressToggleBtns.forEach(b => b.classList.remove('active'));
+        progressSections.forEach(s => s.classList.remove('active'));
+        
+        // Add active class to clicked button and corresponding section
+        btn.classList.add('active');
+        const targetView = btn.dataset.view;
+        document.getElementById(`${targetView}Section`).classList.add('active');
+    });
+});
+
 // Auth state observer
 onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -989,6 +1007,10 @@ function setupProgressListener() {
     // Set up real-time listener for initial/unfiltered data
     progressUnsubscribe = onSnapshot(baseQuery, async () => {
         await updateContactsList(baseQuery);
+        if (progressUser.value) {
+            loadUserActivities(progressUser.value, today);
+            loadUserPageVisits(progressUser.value, today);
+        }
     });
 
     // Load activities and page visits
