@@ -247,6 +247,14 @@ logoutBtn.addEventListener('click', () => {
 // Add this helper function at the top level
 async function deleteUserAndAssociatedData(userId) {
     try {
+        // Get user email before deletion
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (!userDoc.exists()) {
+            throw new Error('User not found');
+        }
+        const userEmail = userDoc.data().email;
+
+        // Create a batch for Firestore operations
         const batch = writeBatch(db);
         
         // Delete user's page visits
@@ -273,8 +281,21 @@ async function deleteUserAndAssociatedData(userId) {
         // Delete the user document
         batch.delete(doc(db, 'users', userId));
 
-        // Commit all deletions
+        // Commit Firestore deletions
         await batch.commit();
+
+        // Create a secondary app to delete the auth user
+        const secondaryApp = initializeSecondaryApp(firebaseConfig, "SecondaryDeleteApp");
+        const secondaryAuth = getAuth(secondaryApp);
+
+        // Sign in as the user to be deleted
+        await signInWithEmailAndPassword(secondaryAuth, userEmail, userPassword.value);
+        
+        // Delete the authentication user
+        await deleteUser(secondaryAuth.currentUser);
+        
+        // Delete the secondary app
+        await deleteApp(secondaryApp);
 
         return true;
     } catch (error) {
@@ -332,14 +353,36 @@ createUserForm.addEventListener('submit', async (e) => {
 
 // Update the delete user function to delete all associated data
 window.deleteUser = async (userId) => {
-    if (confirm('Are you sure you want to delete this user and ALL their associated data?')) {
-        try {
-            await deleteUserAndAssociatedData(userId);
-            loadExistingUsers(); // Refresh the list
-            loadUsers(); // Refresh select dropdowns
-            alert('User and all associated data deleted successfully');
-        } catch (error) {
-            alert('Error deleting user: ' + error.message);
+    if (!confirm('Are you sure you want to delete this user and ALL their associated data? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        // Show loading state
+        const deleteButton = document.querySelector(`tr[data-userid="${userId}"] .delete-user-btn`);
+        if (deleteButton) {
+            deleteButton.disabled = true;
+            deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        await deleteUserAndAssociatedData(userId);
+        
+        // Refresh the displays
+        await Promise.all([
+            loadExistingUsers(),  // Refresh users table
+            loadUsers()           // Refresh select dropdowns
+        ]);
+
+        alert('User and all associated data deleted successfully');
+    } catch (error) {
+        console.error('Error during user deletion:', error);
+        alert('Error deleting user: ' + error.message);
+    } finally {
+        // Reset button state if it exists
+        const deleteButton = document.querySelector(`tr[data-userid="${userId}"] .delete-user-btn`);
+        if (deleteButton) {
+            deleteButton.disabled = false;
+            deleteButton.innerHTML = '<i class="fas fa-trash"></i>';
         }
     }
 };
@@ -1141,15 +1184,40 @@ async function editContact(contactId) {
     }
 }
 
-async function deleteContact(contactId) {
-    if (confirm('Are you sure you want to delete this contact?')) {
-        try {
-            await deleteDoc(doc(db, 'contacts', contactId));
-        } catch (error) {
-            alert('Error deleting contact: ' + error.message);
+// Update the window.deleteContact function
+window.deleteContact = async (contactId) => {
+    if (!confirm('Are you sure you want to delete this contact?')) {
+        return;
+    }
+
+    try {
+        // Show loading state on the delete button
+        const deleteButton = document.querySelector(`tr[data-contactid="${contactId}"] .delete-btn`);
+        if (deleteButton) {
+            deleteButton.disabled = true;
+            deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        await deleteDoc(doc(db, 'contacts', contactId));
+        
+        // Remove the row from the table
+        const row = document.querySelector(`tr[data-contactid="${contactId}"]`);
+        if (row) {
+            row.remove();
+        }
+
+    } catch (error) {
+        console.error('Error deleting contact:', error);
+        alert('Error deleting contact: ' + error.message);
+    } finally {
+        // Reset button state if the row still exists
+        const deleteButton = document.querySelector(`tr[data-contactid="${contactId}"] .delete-btn`);
+        if (deleteButton) {
+            deleteButton.disabled = false;
+            deleteButton.innerHTML = '<i class="fas fa-trash"></i>';
         }
     }
-}
+};
 
 // Add activity date change handler
 activityDate.addEventListener('change', () => {
