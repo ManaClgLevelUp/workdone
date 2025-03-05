@@ -189,6 +189,24 @@ if (menuToggle && sidebar && sidebarOverlay) {
         menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
     });
 }
+    
+// Add this after DOM Elements section
+const progressToggleBtns = document.querySelectorAll('.progress-toggle-btn');
+const progressSections = document.querySelectorAll('.progress-section');
+
+// Add this to your initialization code
+progressToggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        // Remove active class from all buttons and sections
+        progressToggleBtns.forEach(b => b.classList.remove('active'));
+        progressSections.forEach(s => s.classList.remove('active'));
+        
+        // Add active class to clicked button and corresponding section
+        btn.classList.add('active');
+        const targetView = btn.dataset.view;
+        document.getElementById(`${targetView}Section`).classList.add('active');
+    });
+});
 
 // Auth state observer
 onAuthStateChanged(auth, async (user) => {
@@ -247,6 +265,14 @@ logoutBtn.addEventListener('click', () => {
 // Add this helper function at the top level
 async function deleteUserAndAssociatedData(userId) {
     try {
+        // Get user email before deletion
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (!userDoc.exists()) {
+            throw new Error('User not found');
+        }
+        const userEmail = userDoc.data().email;
+
+        // Create a batch for Firestore operations
         const batch = writeBatch(db);
         
         // Delete user's page visits
@@ -273,8 +299,21 @@ async function deleteUserAndAssociatedData(userId) {
         // Delete the user document
         batch.delete(doc(db, 'users', userId));
 
-        // Commit all deletions
+        // Commit Firestore deletions
         await batch.commit();
+
+        // Create a secondary app to delete the auth user
+        const secondaryApp = initializeSecondaryApp(firebaseConfig, "SecondaryDeleteApp");
+        const secondaryAuth = getAuth(secondaryApp);
+
+        // Sign in as the user to be deleted
+        await signInWithEmailAndPassword(secondaryAuth, userEmail, userPassword.value);
+        
+        // Delete the authentication user
+        await deleteUser(secondaryAuth.currentUser);
+        
+        // Delete the secondary app
+        await deleteApp(secondaryApp);
 
         return true;
     } catch (error) {
@@ -332,14 +371,36 @@ createUserForm.addEventListener('submit', async (e) => {
 
 // Update the delete user function to delete all associated data
 window.deleteUser = async (userId) => {
-    if (confirm('Are you sure you want to delete this user and ALL their associated data?')) {
-        try {
-            await deleteUserAndAssociatedData(userId);
-            loadExistingUsers(); // Refresh the list
-            loadUsers(); // Refresh select dropdowns
-            alert('User and all associated data deleted successfully');
-        } catch (error) {
-            alert('Error deleting user: ' + error.message);
+    if (!confirm('Are you sure you want to delete this user and ALL their associated data? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        // Show loading state
+        const deleteButton = document.querySelector(`tr[data-userid="${userId}"] .delete-user-btn`);
+        if (deleteButton) {
+            deleteButton.disabled = true;
+            deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        await deleteUserAndAssociatedData(userId);
+        
+        // Refresh the displays
+        await Promise.all([
+            loadExistingUsers(),  // Refresh users table
+            loadUsers()           // Refresh select dropdowns
+        ]);
+
+        alert('User and all associated data deleted successfully');
+    } catch (error) {
+        console.error('Error during user deletion:', error);
+        alert('Error deleting user: ' + error.message);
+    } finally {
+        // Reset button state if it exists
+        const deleteButton = document.querySelector(`tr[data-userid="${userId}"] .delete-user-btn`);
+        if (deleteButton) {
+            deleteButton.disabled = false;
+            deleteButton.innerHTML = '<i class="fas fa-trash"></i>';
         }
     }
 };
@@ -946,11 +1007,19 @@ function setupProgressListener() {
     // Set up real-time listener for initial/unfiltered data
     progressUnsubscribe = onSnapshot(baseQuery, async () => {
         await updateContactsList(baseQuery);
+        if (progressUser.value) {
+            loadUserActivities(progressUser.value, today);
+            loadUserPageVisits(progressUser.value, today);
+        }
     });
 
     // Load activities and page visits
     loadUserActivities(progressUser.value, today);
     loadUserPageVisits(progressUser.value, today);
+
+    // Initialize activity date filters
+    initActivityDateRange();
+    initPeriodSelector();
 }
 
 // Update loadUserActivities function
@@ -1141,15 +1210,40 @@ async function editContact(contactId) {
     }
 }
 
-async function deleteContact(contactId) {
-    if (confirm('Are you sure you want to delete this contact?')) {
-        try {
-            await deleteDoc(doc(db, 'contacts', contactId));
-        } catch (error) {
-            alert('Error deleting contact: ' + error.message);
+// Update the window.deleteContact function
+window.deleteContact = async (contactId) => {
+    if (!confirm('Are you sure you want to delete this contact?')) {
+        return;
+    }
+
+    try {
+        // Show loading state on the delete button
+        const deleteButton = document.querySelector(`tr[data-contactid="${contactId}"] .delete-btn`);
+        if (deleteButton) {
+            deleteButton.disabled = true;
+            deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        await deleteDoc(doc(db, 'contacts', contactId));
+        
+        // Remove the row from the table
+        const row = document.querySelector(`tr[data-contactid="${contactId}"]`);
+        if (row) {
+            row.remove();
+        }
+
+    } catch (error) {
+        console.error('Error deleting contact:', error);
+        alert('Error deleting contact: ' + error.message);
+    } finally {
+        // Reset button state if the row still exists
+        const deleteButton = document.querySelector(`tr[data-contactid="${contactId}"] .delete-btn`);
+        if (deleteButton) {
+            deleteButton.disabled = false;
+            deleteButton.innerHTML = '<i class="fas fa-trash"></i>';
         }
     }
-}
+};
 
 // Add activity date change handler
 activityDate.addEventListener('change', () => {
@@ -1259,4 +1353,277 @@ function resetAllDisplays() {
     if (displays.activityLog) displays.activityLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
     if (displays.totalTimeToday) displays.totalTimeToday.textContent = '-';
     if (displays.pageOpens) displays.pageOpens.textContent = '0';
+}
+
+// Add these new functions after your existing activity-related functions
+function initActivityDateRange() {
+    const today = new Date();
+    const startDate = document.getElementById('startDate');
+    const endDate = document.getElementById('endDate');
+    
+    // Set default date range to current week
+    startDate.value = formatDateForInput(new Date(today.setDate(today.getDate() - 7)));
+    endDate.value = formatDateForInput(new Date());
+    
+    // Add event listeners
+    startDate.addEventListener('change', updateActivityData);
+    endDate.addEventListener('change', updateActivityData);
+}
+
+function initPeriodSelector() {
+    const periodBtns = document.querySelectorAll('.period-btn');
+    
+    periodBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Remove active class from all buttons
+            periodBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            // Set date range based on selected period
+            const period = btn.dataset.period;
+            setDateRangeForPeriod(period);
+            updateActivityData();
+        });
+    });
+}
+
+function setDateRangeForPeriod(period) {
+    const today = new Date();
+    const startDate = document.getElementById('startDate');
+    const endDate = document.getElementById('endDate');
+    
+    switch(period) {
+        case 'day':
+            startDate.value = formatDateForInput(today);
+            endDate.value = formatDateForInput(today);
+            break;
+        case 'week':
+            startDate.value = formatDateForInput(new Date(today.setDate(today.getDate() - 7)));
+            endDate.value = formatDateForInput(new Date());
+            break;
+        case 'month':
+            startDate.value = formatDateForInput(new Date(today.setMonth(today.getMonth() - 1)));
+            endDate.value = formatDateForInput(new Date());
+            break;
+    }
+}
+
+// async function updateActivityData() {
+//     const startDate = document.getElementById('startDate').value;
+//     const endDate = document.getElementById('endDate').value;
+//     const userId = progressUser.value;
+    
+//     if (!userId || !startDate || !endDate) return;
+    
+//     try {
+//         // Fetch activities for date range
+//         const activities = await getActivitiesForDateRange(userId, startDate, endDate);
+        
+//         // Update summary cards
+//         updateActivitySummary(activities);
+        
+//         // Update activity logs
+//         updateActivityLogs(activities);
+//     } catch (error) {
+//         console.error('Error updating activity data:', error);
+//     }
+// }
+
+async function getActivitiesForDateRange(userId, startDate, endDate) {
+    const activitiesRef = collection(db, 'userActivities');
+    const startDateTime = new Date(startDate);
+    startDateTime.setHours(0, 0, 0, 0); // Start of day
+    
+    const endDateTime = new Date(endDate);
+    endDateTime.setHours(23, 59, 59, 999); // End of day
+
+    try {
+        // Query for both activities and page visits
+        const activitiesQuery = query(
+            activitiesRef,
+            where('userId', '==', userId),
+            where('date', '>=', startDate),
+            where('date', '<=', endDate),
+            orderBy('date', 'desc'),
+            orderBy('startTime', 'desc')
+        );
+
+        const snapshot = await getDocs(activitiesQuery);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            timestamp: doc.data().timestamp || doc.data().startTime // Fallback for older records
+        }));
+    } catch (error) {
+        console.error('Error fetching activities:', error);
+        return [];
+    }
+}
+
+function updateActivitySummary(activities) {
+    let totalTime = 0;
+    let totalSessions = activities.length;
+    let completedTasks = activities.filter(a => a.status === 'completed').length;
+    
+    activities.forEach(activity => {
+        if (activity.duration) {
+            totalTime += activity.duration;
+        }
+    });
+    
+    // Update summary cards
+    document.getElementById('totalActiveTime').textContent = formatDuration(totalTime);
+    document.getElementById('avgDailyTime').textContent = formatDuration(totalTime / getDaysBetweenDates());
+    document.getElementById('totalSessions').textContent = totalSessions;
+    document.getElementById('completionRate').textContent = 
+        totalSessions ? `${Math.round((completedTasks / totalSessions) * 100)}%` : '0%';
+}
+
+function formatDateForInput(date) {
+    return date.toISOString().split('T')[0];
+}
+
+function getDaysBetweenDates() {
+    const startDate = new Date(document.getElementById('startDate').value);
+    const endDate = new Date(document.getElementById('endDate').value);
+    return Math.max(1, Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)));
+}
+
+// Add missing updateActivityLogs function
+function updateActivityLogs(activities) {
+    const activityLog = document.getElementById('activityLog');
+    const visitsLog = document.getElementById('visitsLog');
+
+    // Update activity log
+    const activityHtml = activities.map(activity => {
+        const startTime = activity.startTime;
+        const type = activity.type || 'Page Visit';
+        const duration = activity.duration ? formatDuration(activity.duration) : '-';
+
+        return `
+            <tr>
+                <td>${formatLogTime(startTime)}</td>
+                <td>${type}</td>
+                <td>${duration}</td>
+            </tr>
+        `;
+    }).join('');
+
+    activityLog.innerHTML = activityHtml || '<tr><td colspan="3">No activities recorded for this period</td></tr>';
+
+    // Update visits log for page visits
+    const visitsHtml = activities
+        .filter(activity => activity.type === 'Page Visit' && activity.openTime && activity.closeTime)
+        .map(visit => `
+            <tr>
+                <td>${formatLogTime(visit.openTime)}</td>
+                <td>${formatLogTime(visit.closeTime)}</td>
+                <td>${formatDuration(visit.duration)}</td>
+            </tr>
+        `).join('');
+
+    visitsLog.innerHTML = visitsHtml || '<tr><td colspan="3">No page visits recorded for this period</td></tr>';
+}
+
+// Update the getActivitiesForDateRange function to handle date ranges properly
+// async function getActivitiesForDateRange(userId, startDate, endDate) {
+//     const activitiesRef = collection(db, 'userActivities');
+//     const startDateTime = new Date(startDate);
+//     const endDateTime = new Date(endDate);
+//     endDateTime.setHours(23, 59, 59, 999); // Set to end of day
+
+//     const q = query(
+//         activitiesRef,
+//         where('userId', '==', userId),
+//         where('timestamp', '>=', startDateTime),
+//         where('timestamp', '<=', endDateTime),
+//         orderBy('timestamp', 'desc')
+//     );
+    
+//     try {
+//         const snapshot = await getDocs(q);
+//         return snapshot.docs.map(doc => ({
+//             id: doc.id,
+//             ...doc.data()
+//         }));
+//     } catch (error) {
+//         console.error('Error fetching activities:', error);
+//         return [];
+//     }
+// }
+
+// Update the updateActivityData function to handle errors better
+async function updateActivityData() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const userId = progressUser.value;
+    
+    if (!userId || !startDate || !endDate) {
+        resetActivityDisplays();
+        return;
+    }
+    
+    try {
+        // Show loading state
+        showLoadingState();
+        
+        // Fetch activities for date range
+        const activities = await getActivitiesForDateRange(userId, startDate, endDate);
+        
+        // Update summary cards
+        updateActivitySummary(activities);
+        
+        // Update activity logs
+        updateActivityLogs(activities);
+        
+    } catch (error) {
+        console.error('Error updating activity data:', error);
+        showErrorState('Error loading activity data');
+    } finally {
+        hideLoadingState();
+    }
+}
+
+// Add helper functions for loading states
+function showLoadingState() {
+    const loaders = document.querySelectorAll('.activity-loader');
+    loaders.forEach(loader => loader.style.display = 'block');
+}
+
+function hideLoadingState() {
+    const loaders = document.querySelectorAll('.activity-loader');
+    loaders.forEach(loader => loader.style.display = 'none');
+}
+
+function showErrorState(message) {
+    // Update activity displays with error message
+    const displays = [
+        document.getElementById('activityLog'),
+        document.getElementById('visitsLog')
+    ];
+    
+    displays.forEach(display => {
+        if (display) {
+            display.innerHTML = `<tr><td colspan="3">${message}</td></tr>`;
+        }
+    });
+}
+
+function resetActivityDisplays() {
+    // Reset all activity displays to default state
+    const elements = {
+        activityLog: document.getElementById('activityLog'),
+        visitsLog: document.getElementById('visitsLog'),
+        totalActiveTime: document.getElementById('totalActiveTime'),
+        avgDailyTime: document.getElementById('avgDailyTime'),
+        totalSessions: document.getElementById('totalSessions'),
+        completionRate: document.getElementById('completionRate')
+    };
+
+    if (elements.activityLog) elements.activityLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
+    if (elements.visitsLog) elements.visitsLog.innerHTML = '<tr><td colspan="3">No data available</td></tr>';
+    if (elements.totalActiveTime) elements.totalActiveTime.textContent = '-';
+    if (elements.avgDailyTime) elements.avgDailyTime.textContent = '-';
+    if (elements.totalSessions) elements.totalSessions.textContent = '-';
+    if (elements.completionRate) elements.completionRate.textContent = '-';
 }
