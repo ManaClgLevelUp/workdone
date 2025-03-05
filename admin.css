@@ -1248,3 +1248,120 @@ tr:hover {
     background: var(--primary-color);
     color: var(--header-text);
 }
+
+/* Activity Date Filters Styles */
+.activity-date-filters {
+    background: var(--surface-color);
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--card-shadow);
+}
+
+.period-selector {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.period-btn {
+    padding: 0.8rem 1.5rem;
+    border: 2px solid var(--primary-color);
+    background: none;
+    color: var(--text-primary);
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    flex: 1;
+    text-align: center;
+}
+
+.period-btn.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+.date-range {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.date-input-group {
+    flex: 1;
+}
+
+.date-input-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.date-input {
+    width: 100%;
+    padding: 0.8rem;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--surface-color);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+/* Activity Summary Cards Styles */
+.activity-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-card {
+    background: var(--surface-color);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.3s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-2px);
+}
+
+.card-title {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.card-value {
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .activity-date-filters,
+[data-theme="dark"] .summary-card {
+    background: var(--surface-color);
+}
+
+[data-theme="dark"] .date-input {
+    background: var(--input-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+    .date-range {
+        flex-direction: column;
+    }
+    
+    .activity-summary-cards {
+        grid-template-columns: 1fr;
+    }
+}

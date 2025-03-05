@@ -167,6 +167,43 @@
 
                     <!-- User Activity Section -->
                     <div id="userActivitySection" class="progress-section">
+                        <div class="activity-date-filters">
+                            <div class="period-selector">
+                                <button class="period-btn active" data-period="day">Day</button>
+                                <button class="period-btn" data-period="week">Week</button>
+                                <button class="period-btn" data-period="month">Month</button>
+                            </div>
+                            <div class="date-range">
+                                <div class="date-input-group">
+                                    <label>From:</label>
+                                    <input type="date" id="startDate" class="date-input">
+                                </div>
+                                <div class="date-input-group">
+                                    <label>To:</label>
+                                    <input type="date" id="endDate" class="date-input">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="activity-summary-cards">
+                            <div class="summary-card">
+                                <div class="card-title">Total Active Time</div>
+                                <div class="card-value" id="totalActiveTime">-</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="card-title">Average Daily Time</div>
+                                <div class="card-value" id="avgDailyTime">-</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="card-title">Total Sessions</div>
+                                <div class="card-value" id="totalSessions">-</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="card-title">Completion Rate</div>
+                                <div class="card-value" id="completionRate">-</div>
+                            </div>
+                        </div>
+
                         <div id="userActivityInfo" class="user-activity-info">
                             <div class="view-toggle">
                                 <button class="toggle-btn active" data-view="summary">Active Summary</button>
