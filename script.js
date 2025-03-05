@@ -44,40 +44,47 @@ togglePassword.addEventListener('click', () => {
     }
 });
 
-// Update login form submission
+// Update the login form submission with better error handling and redirection
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
+    const selectedRole = document.querySelector('.role-btn.active').dataset.role;
 
     try {
-        // First verify if user exists and get their role
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('email', '==', email));
-        const querySnapshot = await getDocs(q);
+        // First try to sign in
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
         
-        if (querySnapshot.empty) {
-            alert('User not found');
+        // Then verify role
+        const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+        
+        if (!userDoc.exists()) {
+            console.error('User document not found');
+            await signOut(auth);
+            alert('User data not found. Please contact administrator.');
             return;
         }
 
-        // Get user data and check role before login
-        const userData = querySnapshot.docs[0].data();
+        const userData = userDoc.data();
         if (userData.role !== selectedRole) {
+            console.error('Role mismatch:', userData.role, selectedRole);
+            await signOut(auth);
             alert(`Please select the correct role. You are a ${userData.role}.`);
             return;
         }
 
-        // If role matches, proceed with login
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
+        // Store auth state in localStorage
+        localStorage.setItem('authUser', JSON.stringify({
+            uid: userCredential.user.uid,
+            role: userData.role
+        }));
 
-        // Redirect based on role
+        // Redirect based on role using replace
         if (userData.role === 'admin') {
-            window.location.href = 'admin.html';
+            window.location.replace(`${window.location.origin}/admin.html`);
         } else {
-            window.location.href = 'user.html';
+            window.location.replace(`${window.location.origin}/user.html`);
         }
 
     } catch (error) {
@@ -92,27 +99,26 @@ loginForm.addEventListener('submit', async (e) => {
     }
 });
 
-// Check if user is already logged in
+// Update auth state observer to handle stored auth state
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         try {
-            const docRef = doc(db, 'users', user.uid);
-            const docSnap = await getDoc(docRef);
-            
-            if (docSnap.exists()) {
-                const userData = docSnap.data();
-                if (userData.role === 'admin') {
-                    window.location.href = 'admin.html';
-                } else if (userData.role === 'user') {
-                    window.location.href = 'user.html';
+            const storedAuth = JSON.parse(localStorage.getItem('authUser') || '{}');
+            if (storedAuth.uid === user.uid) {
+                // Use relative paths for redirects
+                if (storedAuth.role === 'admin') {
+                    window.location.replace('admin.html');
+                } else if (storedAuth.role === 'user') {
+                    window.location.replace('user.html');
                 }
             } else {
-                // Handle case where user document doesn't exist
-                console.log("No user data found");
+                // Clear stored auth if UIDs don't match
+                localStorage.removeItem('authUser');
                 await signOut(auth);
             }
         } catch (error) {
-            console.error("Error checking user role:", error);
+            console.error("Error checking stored auth:", error);
+            localStorage.removeItem('authUser');
             await signOut(auth);
         }
     }

@@ -80,63 +80,68 @@ async function logPageVisit(type) {
     }
 }
 
-// Authentication State Observer
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
+// Add error handling and logging
+async function checkUserRole(user) {
+    try {
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists() && userDoc.data().role === 'user') {
-            currentUser = user;
-            currentUserId = user.uid;
-            userName.textContent = userDoc.data().name || 'User';
-            
-            // Start page visit tracking
-            await logPageVisit('opened');
+        console.log('User doc exists:', userDoc.exists());
+        console.log('User role:', userDoc.data()?.role);
+        return userDoc.exists() && userDoc.data().role === 'user';
+    } catch (error) {
+        console.error('Error checking user role:', error);
+        return false;
+    }
+}
 
-            // Add event listeners for page state changes
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-            window.addEventListener('beforeunload', handleBeforeUnload);
+// Update the auth state observer with better error handling
+onAuthStateChanged(auth, async (user) => {
+    try {
+        if (user) {
+            console.log('Auth state changed - user:', user.uid);
+            const isValidUser = await checkUserRole(user);
+            console.log('Is valid user:', isValidUser);
 
-            loadContacts('students'); // Default work type
+            if (isValidUser) {
+                currentUser = user;
+                currentUserId = user.uid;
+                
+                // Get user data
+                const userDoc = await getDoc(doc(db, 'users', user.uid));
+                userName.textContent = userDoc.data().name || 'User';
+                
+                // Start tracking and load data
+                await Promise.all([
+                    logPageVisit('opened'),
+                    loadContacts('students')
+                ]);
 
-            // Log user login
-            const activityRef = await addDoc(collection(db, 'userActivities'), {
-                userId: user.uid,
-                type: 'login',
-                startTime: serverTimestamp(),
-                date: new Date().toISOString().split('T')[0]
-            });
-            activityLogRef = activityRef;
-
-            // Log page open
-            await logPageVisit(user.uid, true);
-
-            // Add page visibility change detection
-            document.addEventListener('visibilitychange', async () => {
-                if (document.visibilityState === 'hidden') {
-                    await logPageVisit(user.uid, false);
-                } else if (document.visibilityState === 'visible') {
-                    await logPageVisit(user.uid, true);
-                }
-            });
-
-            // Set up disconnect logging
-            window.addEventListener('beforeunload', async () => {
-                if (activityLogRef) {
-                    await updateDoc(activityLogRef, {
-                        endTime: serverTimestamp(),
-                        duration: firebase.firestore.FieldValue.increment(1)
-                    });
-                }
-                await logPageVisit(user.uid, false);
-            });
-
-            initTheme(); // Initialize theme
+                // Set up event listeners
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                
+                // Log activity
+                activityLogRef = await addDoc(collection(db, 'userActivities'), {
+                    userId: user.uid,
+                    type: 'login',
+                    startTime: serverTimestamp(),
+                    date: new Date().toISOString().split('T')[0]
+                });
+                
+                initTheme();
+            } else {
+                console.log('Not a valid user, redirecting to login');
+                await signOut(auth);
+                window.location.replace('index.html');
+            }
         } else {
-            window.location.href = 'index.html';
+            console.log('No user, redirecting to login');
+            window.location.replace('index.html');
         }
-    } else {
-        window.location.href = 'index.html';
+    } catch (error) {
+        console.error('Error in auth state observer:', error);
+        // Handle error gracefully
+        window.location.replace('index.html');
     }
 });
 
