@@ -23,6 +23,9 @@ const loginForm = document.getElementById('loginForm');
 const togglePassword = document.querySelector('.toggle-password');
 let selectedRole = 'admin'; // Default role
 
+// Add this flag to prevent redirect loops
+let isLoggingIn = false;
+
 // Role selection handling
 roleButtons.forEach(button => {
     button.addEventListener('click', () => {
@@ -53,6 +56,9 @@ loginForm.addEventListener('submit', async (e) => {
     const selectedRole = document.querySelector('.role-btn.active').dataset.role;
 
     try {
+        // Set logging in flag
+        isLoggingIn = true;
+
         // First try to sign in
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         
@@ -77,18 +83,17 @@ loginForm.addEventListener('submit', async (e) => {
         // Store auth state in localStorage
         localStorage.setItem('authUser', JSON.stringify({
             uid: userCredential.user.uid,
-            role: userData.role
+            role: userData.role,
+            timestamp: Date.now() // Add timestamp for session tracking
         }));
 
         // Redirect based on role using replace
-        if (userData.role === 'admin') {
-            window.location.replace(`${window.location.origin}/admin.html`);
-        } else {
-            window.location.replace(`${window.location.origin}/user.html`);
-        }
+        const redirectTo = userData.role === 'admin' ? 'admin.html' : 'user.html';
+        window.location.replace(redirectTo);
 
     } catch (error) {
         console.error('Login error:', error);
+        isLoggingIn = false; // Reset flag on error
         if (error.code === 'auth/wrong-password') {
             alert('Invalid password');
         } else if (error.code === 'auth/user-not-found') {
@@ -101,25 +106,45 @@ loginForm.addEventListener('submit', async (e) => {
 
 // Update auth state observer to handle stored auth state
 onAuthStateChanged(auth, async (user) => {
+    // Don't redirect if we're in the process of logging in
+    if (isLoggingIn) return;
+
+    // Check if we're already on the login page
+    const isLoginPage = window.location.pathname.endsWith('index.html') || 
+                       window.location.pathname === '/';
+
     if (user) {
         try {
             const storedAuth = JSON.parse(localStorage.getItem('authUser') || '{}');
-            if (storedAuth.uid === user.uid) {
-                // Use relative paths for redirects
-                if (storedAuth.role === 'admin') {
-                    window.location.replace('admin.html');
-                } else if (storedAuth.role === 'user') {
-                    window.location.replace('user.html');
+            
+            // Verify stored auth is still valid (within 24 hours)
+            const isValidSession = storedAuth.timestamp && 
+                                 (Date.now() - storedAuth.timestamp) < 24 * 60 * 60 * 1000;
+
+            if (storedAuth.uid === user.uid && isValidSession) {
+                if (isLoginPage) {
+                    // Only redirect if we're on the login page
+                    const redirectTo = storedAuth.role === 'admin' ? 'admin.html' : 'user.html';
+                    window.location.replace(redirectTo);
                 }
             } else {
-                // Clear stored auth if UIDs don't match
+                // Clear invalid auth data
                 localStorage.removeItem('authUser');
                 await signOut(auth);
+                if (!isLoginPage) {
+                    window.location.replace('index.html');
+                }
             }
         } catch (error) {
             console.error("Error checking stored auth:", error);
             localStorage.removeItem('authUser');
             await signOut(auth);
+            if (!isLoginPage) {
+                window.location.replace('index.html');
+            }
         }
+    } else if (!isLoginPage) {
+        // Only redirect to login if we're not already there
+        window.location.replace('index.html');
     }
 });

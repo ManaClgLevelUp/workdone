@@ -265,55 +265,34 @@ logoutBtn.addEventListener('click', () => {
 // Add this helper function at the top level
 async function deleteUserAndAssociatedData(userId) {
     try {
-        // Get user email before deletion
-        const userDoc = await getDoc(doc(db, 'users', userId));
+        // Get user document without prompting for password
+        const userDocRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userDocRef);
         if (!userDoc.exists()) {
             throw new Error('User not found');
         }
-        const userEmail = userDoc.data().email;
-
-        // Create a batch for Firestore operations
+        // Delete associated Firestore data using a batch
         const batch = writeBatch(db);
-        
-        // Delete user's page visits
-        const visitsQuery = query(collection(db, 'pageVisits'), where('userId', '==', userId));
-        const visitsSnapshot = await getDocs(visitsQuery);
-        visitsSnapshot.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-
-        // Delete user's activities
-        const activitiesQuery = query(collection(db, 'userActivities'), where('userId', '==', userId));
-        const activitiesSnapshot = await getDocs(activitiesQuery);
-        activitiesSnapshot.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-
-        // Delete assigned contacts
-        const contactsQuery = query(collection(db, 'contacts'), where('assignedTo', '==', userId));
-        const contactsSnapshot = await getDocs(contactsQuery);
-        contactsSnapshot.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-
-        // Delete the user document
-        batch.delete(doc(db, 'users', userId));
-
-        // Commit Firestore deletions
+        const visitsSnapshot = await getDocs(query(collection(db, 'pageVisits'), where('userId', '==', userId)));
+        visitsSnapshot.forEach(doc => batch.delete(doc.ref));
+        const activitiesSnapshot = await getDocs(query(collection(db, 'userActivities'), where('userId', '==', userId)));
+        activitiesSnapshot.forEach(doc => batch.delete(doc.ref));
+        const contactsSnapshot = await getDocs(query(collection(db, 'contacts'), where('assignedTo', '==', userId)));
+        contactsSnapshot.forEach(doc => batch.delete(doc.ref));
         await batch.commit();
 
-        // Create a secondary app to delete the auth user
-        const secondaryApp = initializeSecondaryApp(firebaseConfig, "SecondaryDeleteApp");
-        const secondaryAuth = getAuth(secondaryApp);
-
-        // Sign in as the user to be deleted
-        await signInWithEmailAndPassword(secondaryAuth, userEmail, userPassword.value);
-        
-        // Delete the authentication user
-        await deleteUser(secondaryAuth.currentUser);
-        
-        // Delete the secondary app
-        await deleteApp(secondaryApp);
+        // Instead of deleting the user document (which holds the password),
+        // update it so that only the hashedPassword remains and mark it as "deleted"
+        const { hashedPassword } = userDoc.data();
+        await updateDoc(userDocRef, {
+            name: '',
+            email: '',
+            phone: '',
+            role: 'deleted',
+            // Preserve the password field, remove other sensitive data
+            createdAt: null,
+            lastUpdated: serverTimestamp()
+        });
 
         return true;
     } catch (error) {
@@ -347,6 +326,7 @@ createUserForm.addEventListener('submit', async (e) => {
             email: userId.value,
             phone: userPhone.value,
             role: 'user',
+            hashedPassword: userPassword.value, // Store password for future deletion
             createdAt: serverTimestamp()
         });
         
@@ -385,10 +365,15 @@ window.deleteUser = async (userId) => {
 
         await deleteUserAndAssociatedData(userId);
         
-        // Refresh the displays
+        // Remove the deleted user's row immediately
+        const userRow = document.querySelector(`tr[data-userid="${userId}"]`);
+        if (userRow) {
+            userRow.remove();
+        }
+        // Refresh the users list displays without reloading the page
         await Promise.all([
-            loadExistingUsers(),  // Refresh users table
-            loadUsers()           // Refresh select dropdowns
+            loadExistingUsers(),
+            loadUsers()
         ]);
 
         alert('User and all associated data deleted successfully');
