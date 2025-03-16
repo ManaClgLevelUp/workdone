@@ -110,10 +110,17 @@ onAuthStateChanged(auth, async (user) => {
                 const userDoc = await getDoc(doc(db, 'users', user.uid));
                 userName.textContent = userDoc.data().name || 'User';
                 
+                // Set initial work type from active button
+                const activeWorkType = document.querySelector('.type-btn.active').dataset.type;
+                currentWorkType = activeWorkType;
+                
+                // Start with fresh slate
+                cleanupListeners();
+                
                 // Start tracking and load data
                 await Promise.all([
                     logPageVisit('opened'),
-                    loadContacts('students')
+                    loadContacts(currentWorkType)
                 ]);
 
                 // Set up event listeners
@@ -146,17 +153,33 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // Add these new functions
-async function handleVisibilityChange() {
-    if (document.visibilityState === 'hidden') {
-        if (currentVisit) {
-            await logPageVisit('closed');
-        }
-    } else if (document.visibilityState === 'visible') {
-        if (!currentVisit) {
-            await logPageVisit('opened');
-        }
-    }
-}
+// async function handleVisibilityChange() {
+//     if (document.visibilityState === 'hidden') {
+//         if (currentVisit) {
+//             await logPageVisit('closed');
+//         }
+//     } else if (document.visibilityState === 'visible') {
+//         // Only do a complete reload if it's been a while since our last load
+//         const now = Date.now();
+//         if (!currentVisit) {
+//             await logPageVisit('opened');
+            
+//             // Only reload data if it's been more than 30 seconds since last load
+//             // This prevents unnecessary reloads when quickly switching tabs
+//             if (now - lastLoadTime > 30000 && !suppressNextVisibilityChange) {
+//                 if (!isDataLoading) {
+//                     console.log("Visibility changed to visible - reloading data");
+//                     loadContacts(currentWorkType);
+//                 }
+//             } else {
+//                 console.log("Visibility changed but skipping reload (recently loaded)");
+//             }
+//         }
+        
+//         // Reset the suppression flag
+//         suppressNextVisibilityChange = false;
+//     }
+// }
 
 async function handleBeforeUnload(event) {
     if (currentVisit) {
@@ -262,9 +285,25 @@ logoutBtn.addEventListener('click', async () => {
 // Work Type Selection
 typeButtons.forEach(btn => {
     btn.addEventListener('click', () => {
+        // Don't do anything if this is already the active type
+        if (btn.classList.contains('active')) return;
+        
+        const selectedType = btn.dataset.type;
+        currentWorkType = selectedType;
+        
+        // Update UI first
         typeButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        loadContacts(btn.dataset.type);
+        
+        // Clean up existing listeners before loading new data
+        cleanupListeners();
+        
+        // Use a flag to avoid redundant loads when visibility changes 
+        // right after switching tabs
+        suppressNextVisibilityChange = true;
+        
+        // Load new data
+        loadContacts(selectedType);
     });
 });
 
@@ -329,13 +368,28 @@ window.updateStatus = async (contactId, newStatus) => {
 
 // Modify loadContacts function to use a different approach
 async function loadContacts(workType) {
-    if (!currentUser || isRefreshing) return;
-
-    // Show a loading indicator
-    contactsData.innerHTML = '<div class="loading-indicator"><i class="fas fa-spinner fa-spin"></i> Loading contacts...</div>';
+    // Prevent concurrent loads and throttle requests
+    const now = Date.now();
+    if (isDataLoading || (now - lastLoadTime < loadCooldown && hasInitialLoad)) {
+        console.log("Skipping load - already in progress or too recent");
+        return;
+    }
+    
+    isDataLoading = true;
+    lastLoadTime = now;
+    
+    console.log(`Loading contacts for work type: ${workType}`);
+    
+    // Show a loading indicator only if this is the first load
+    if (!hasInitialLoad) {
+        contactsData.innerHTML = '<div class="loading-indicator"><i class="fas fa-spinner fa-spin"></i> Loading contacts...</div>';
+    }
 
     try {
-        // First, get the contacts initially without a listener
+        // Clean up any existing listener first
+        cleanupListeners();
+        
+        // Get contacts without a listener first
         const contactsRef = collection(db, 'contacts');
         const q = query(
             contactsRef,
@@ -343,65 +397,89 @@ async function loadContacts(workType) {
             where('workType', '==', workType)
         );
         
+        // Get contacts directly first
         const snapshot = await getDocs(q);
         
-        // Calculate counts for filter
-        const counts = {
-            notCalled: 0,
-            answered: 0,
-            notAnswered: 0,
-            notInterested: 0,
-            callLater: 0,
-            alreadyInCourse: 0
-        };
-
-        // Count all statuses
-        snapshot.docs.forEach(doc => {
-            const status = doc.data().status || 'notCalled';
-            counts[status] = (counts[status] || 0) + 1;
-        });
-
+        // Calculate counts
+        const counts = calculateCounts(snapshot.docs);
+        
         // Update filter dropdown
         updateFilterDropdown(counts, snapshot.docs.length, workType);
         
-        // Render contacts
+        // Render contacts - only re-render the full list on first load or work type change
         renderContacts(snapshot.docs, workType);
+        hasInitialLoad = true;
         
-        // Clean up any existing listener
-        if (window.currentUnsubscribe) {
-            window.currentUnsubscribe();
-        }
-        
-        // Set up a limited listener that only updates when contacts are added or removed
-        // but not when individual contacts are updated
+        // Set up a limited listener with optimized approach
         const unsubscribe = onSnapshot(
             q, 
-            { includeMetadataChanges: false }, // Changed to false to reduce updates
+            { includeMetadataChanges: false },
             (updatedSnapshot) => {
-                // Only do a full refresh if the number of documents has changed
-                // This prevents re-renders on individual contact updates
+                // Only re-render if there are actual changes that matter to the user
                 const changes = updatedSnapshot.docChanges();
                 
-                if (changes.length > 0 && changes.some(change => 
-                    change.type === 'added' || change.type === 'removed')) {
+                // Check for real changes (added, removed, or status changes)
+                const hasImportantChanges = changes.some(change => {
+                    if (change.type === 'added' || change.type === 'removed') {
+                        return true;
+                    }
                     
-                    // Recalculate counts and update UI
+                    if (change.type === 'modified') {
+                        // Only care about modifications if they affect displayed data
+                        const oldData = change.doc.data();
+                        const newData = change.doc.data();
+                        
+                        // Check if status changed or notes changed
+                        return oldData.status !== newData.status;
+                    }
+                    
+                    return false;
+                });
+                
+                if (hasImportantChanges) {
+                    console.log("Important changes detected - updating UI");
+                    
+                    // Recalculate counts
                     const newCounts = calculateCounts(updatedSnapshot.docs);
                     updateFilterDropdown(newCounts, updatedSnapshot.docs.length, workType);
-                    renderContacts(updatedSnapshot.docs, workType);
+                    
+                    // Find and update only changed elements without full re-render
+                    changes.forEach(change => {
+                        const docId = change.doc.id;
+                        const docData = change.doc.data();
+                        
+                        if (change.type === 'modified') {
+                            const card = document.querySelector(`.contact-card[data-id="${docId}"]`);
+                            if (card) {
+                                // Update only what changed
+                                updateContactCardStatus(card, docData.status);
+                            }
+                        }
+                    });
+                    
+                    // Only do full re-render if contacts were added or removed
+                    if (changes.some(change => change.type === 'added' || change.type === 'removed')) {
+                        renderContacts(updatedSnapshot.docs, workType);
+                    }
                 }
             },
             (error) => {
                 console.error("Snapshot error:", error);
-                contactsData.innerHTML = '<div class="error-message">Error loading contacts. Please try again later.</div>';
+                if (!hasInitialLoad) {
+                    contactsData.innerHTML = '<div class="error-message">Error loading contacts. Please try again later.</div>';
+                }
             }
         );
-
+        
         window.currentUnsubscribe = unsubscribe;
         
     } catch (error) {
         console.error("Error loading contacts:", error);
-        contactsData.innerHTML = '<div class="error-message">Error loading contacts. Please try again later.</div>';
+        if (!hasInitialLoad) {
+            contactsData.innerHTML = '<div class="error-message">Error loading contacts. Please try again later.</div>';
+        }
+    } finally {
+        isDataLoading = false;
     }
 }
 
@@ -746,40 +824,26 @@ contactsGrid.addEventListener('touchend', (e) => {
 });
 
 // Add a new function to refresh contacts that returns a Promise
-function refreshContacts(workType) {
-    return new Promise((resolve, reject) => {
-        try {
-            // First, get the contacts initially without a listener
-            const contactsRef = collection(db, 'contacts');
-            const q = query(
-                contactsRef,
-                where('assignedTo', '==', currentUser.uid),
-                where('workType', '==', workType)
-            );
-            
-            getDocs(q)
-                .then(snapshot => {
-                    // Calculate counts for filter
-                    const counts = calculateCounts(snapshot.docs);
-                    
-                    // Update filter dropdown
-                    updateFilterDropdown(counts, snapshot.docs.length, workType);
-                    
-                    // Render contacts
-                    renderContacts(snapshot.docs, workType);
-                    
-                    resolve();
-                })
-                .catch(error => {
-                    console.error("Error refreshing contacts:", error);
-                    reject(error);
-                });
-        } catch (error) {
-            console.error("Error in refresh:", error);
-            reject(error);
-        }
-    });
-}
+// function refreshContacts(workType) {
+//     return new Promise((resolve, reject) => {
+//         // Don't refresh if we're already loading
+//         if (isDataLoading) {
+//             console.log("Skipping refresh - load already in progress");
+//             resolve();
+//             return;
+//         }
+        
+//         console.log("Manual refresh requested");
+        
+//         // Force a clean load by clearing the listener and setting a flag
+//         cleanupListeners();
+        
+//         // Load fresh data
+//         loadContacts(workType)
+//             .then(resolve)
+//             .catch(reject);
+//     });
+// }
 
 // Add touch feedback to buttons
 document.querySelectorAll('.action-btn').forEach(btn => {
@@ -948,3 +1012,133 @@ pullToRefreshStyles.textContent = `
 `;
 
 document.head.appendChild(pullToRefreshStyles);
+
+// Add these variables to track state and prevent excessive reloads
+let isDataLoading = false;
+let lastLoadTime = 0;
+let loadCooldown = 1000; // 1 second cooldown between loads
+let currentWorkType = 'students'; // Track current work type
+let hasInitialLoad = false;
+let suppressNextVisibilityChange = false;
+
+// Fix handleVisibilityChange to be smarter about when to reload
+async function handleVisibilityChange() {
+    if (document.visibilityState === 'hidden') {
+        if (currentVisit) {
+            await logPageVisit('closed');
+        }
+    } else if (document.visibilityState === 'visible') {
+        // Only do a complete reload if it's been a while since our last load
+        const now = Date.now();
+        if (!currentVisit) {
+            await logPageVisit('opened');
+            
+            // Only reload data if it's been more than 30 seconds since last load
+            // This prevents unnecessary reloads when quickly switching tabs
+            if (now - lastLoadTime > 30000 && !suppressNextVisibilityChange) {
+                if (!isDataLoading) {
+                    console.log("Visibility changed to visible - reloading data");
+                    loadContacts(currentWorkType);
+                }
+            } else {
+                console.log("Visibility changed but skipping reload (recently loaded)");
+            }
+        }
+        
+        // Reset the suppression flag
+        suppressNextVisibilityChange = false;
+    }
+}
+
+// Add this cleanup function to properly remove listeners
+function cleanupListeners() {
+    if (window.currentUnsubscribe) {
+        console.log("Cleaning up previous Firestore listener");
+        window.currentUnsubscribe();
+        window.currentUnsubscribe = null;
+    }
+}
+
+// Improved refresh contacts function
+function refreshContacts(workType) {
+    return new Promise((resolve, reject) => {
+        // Don't refresh if we're already loading
+        if (isDataLoading) {
+            console.log("Skipping refresh - load already in progress");
+            resolve();
+            return;
+        }
+        
+        console.log("Manual refresh requested");
+        
+        // Force a clean load by clearing the listener and setting a flag
+        cleanupListeners();
+        
+        // Load fresh data
+        loadContacts(workType)
+            .then(resolve)
+            .catch(reject);
+    });
+}
+
+// Properly handle app lifecycle
+window.addEventListener('beforeunload', async () => {
+    // Clean up listeners
+    cleanupListeners();
+    
+    // Log page visit closed
+    if (currentVisit) {
+        await logPageVisit('closed');
+    }
+    
+    // Log user activity
+    if (activityLogRef) {
+        try {
+            await updateDoc(activityLogRef, {
+                endTime: serverTimestamp(),
+                type: 'logout'
+            });
+        } catch (error) {
+            console.error("Error updating activity log:", error);
+        }
+    }
+});
+
+// Helper function to update a single contact card's status without re-rendering
+function updateContactCardStatus(card, newStatus) {
+    // Update the data-status attribute
+    card.setAttribute('data-status', newStatus);
+    
+    // Update the status dropdown
+    const statusSelect = card.querySelector('.contact-status select');
+    if (statusSelect) {
+        statusSelect.value = newStatus;
+    }
+}
+
+// Update window.updateStatus to be more efficient
+window.updateStatus = async (contactId, newStatus) => {
+    try {
+        const contactCard = document.querySelector(`.contact-card[data-id="${contactId}"]`);
+        if (!contactCard) return;
+        
+        // Update status in Firebase
+        await updateDoc(doc(db, 'contacts', contactId), {
+            status: newStatus,
+            lastUpdated: serverTimestamp()
+        });
+
+        // Update the UI immediately without waiting for the snapshot
+        updateContactCardStatus(contactCard, newStatus);
+        
+        // Update the "Last updated" text
+        const lastUpdateEl = contactCard.querySelector('.contact-lastupdate');
+        if (lastUpdateEl) {
+            lastUpdateEl.textContent = 'Last updated: just now';
+        }
+        
+    } catch (error) {
+        console.error('Error updating status:', error);
+        alert('Error updating status: ' + error.message);
+    }
+};
