@@ -329,7 +329,7 @@ window.updateStatus = async (contactId, newStatus) => {
 
 // Modify loadContacts function to use a different approach
 async function loadContacts(workType) {
-    if (!currentUser) return;
+    if (!currentUser || isRefreshing) return;
 
     // Show a loading indicator
     contactsData.innerHTML = '<div class="loading-indicator"><i class="fas fa-spinner fa-spin"></i> Loading contacts...</div>';
@@ -367,15 +367,22 @@ async function loadContacts(workType) {
         // Render contacts
         renderContacts(snapshot.docs, workType);
         
+        // Clean up any existing listener
+        if (window.currentUnsubscribe) {
+            window.currentUnsubscribe();
+        }
+        
         // Set up a limited listener that only updates when contacts are added or removed
         // but not when individual contacts are updated
         const unsubscribe = onSnapshot(
             q, 
-            { includeMetadataChanges: true },
+            { includeMetadataChanges: false }, // Changed to false to reduce updates
             (updatedSnapshot) => {
                 // Only do a full refresh if the number of documents has changed
                 // This prevents re-renders on individual contact updates
-                if (updatedSnapshot.docChanges().some(change => 
+                const changes = updatedSnapshot.docChanges();
+                
+                if (changes.length > 0 && changes.some(change => 
                     change.type === 'added' || change.type === 'removed')) {
                     
                     // Recalculate counts and update UI
@@ -390,9 +397,6 @@ async function loadContacts(workType) {
             }
         );
 
-        if (window.currentUnsubscribe) {
-            window.currentUnsubscribe();
-        }
         window.currentUnsubscribe = unsubscribe;
         
     } catch (error) {
@@ -635,27 +639,147 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Add pull-to-refresh functionality
+let lastRefreshTime = 0;
+let refreshCooldown = 2000; // 2 seconds cooldown
+let isRefreshing = false;
+let initialTouchY = 0;
+let lastScrollTop = 0;
+let refreshThreshold = 80; // Increased from 50 to make it less sensitive
+
 contactsGrid.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
+    // Only initiate if we're at the top of the scroll area
+    if (contactsGrid.scrollTop <= 10) {
+        initialTouchY = e.touches[0].clientY;
+        touchStartY = initialTouchY;
+    } else {
+        // Reset to prevent accidental triggers
+        initialTouchY = 0;
+    }
 });
 
 contactsGrid.addEventListener('touchmove', (e) => {
+    // Only process pull-to-refresh if we started at the top
+    if (initialTouchY === 0 || isRefreshing) return;
+    
     const touchY = e.touches[0].clientY;
     const diff = touchY - touchStartY;
+    const currentTime = Date.now();
     
-    if (diff > 50 && contactsGrid.scrollTop === 0) {
+    // Check if we're pulling down enough AND we're at top AND sufficient time has passed
+    if (diff > refreshThreshold && 
+        contactsGrid.scrollTop === 0 &&
+        currentTime - lastRefreshTime > refreshCooldown) {
+        
         contactsGrid.classList.add('refreshing');
-        e.preventDefault();
+        
+        // Create and show pull indicator
+        let indicator = document.querySelector('.pull-indicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.className = 'pull-indicator';
+            indicator.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Releasing will refresh...';
+            contactsGrid.prepend(indicator);
+        }
+        indicator.style.transform = `translateY(${Math.min(diff/2, 70)}px)`;
+        indicator.style.opacity = Math.min(diff / 100, 1);
+        
+        e.preventDefault(); // Prevent scrolling when pulling
     }
 });
 
 contactsGrid.addEventListener('touchend', (e) => {
-    if (contactsGrid.classList.contains('refreshing')) {
-        contactsGrid.classList.remove('refreshing');
+    const indicator = document.querySelector('.pull-indicator');
+    const currentTime = Date.now();
+    
+    // Check if refresh is possible and not in cooldown
+    if (contactsGrid.classList.contains('refreshing') && 
+        currentTime - lastRefreshTime > refreshCooldown && 
+        !isRefreshing) {
+        
+        isRefreshing = true;
+        contactsGrid.classList.add('is-refreshing');
+        
+        if (indicator) {
+            indicator.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Refreshing...';
+            indicator.style.transform = 'translateY(20px)';
+        }
+        
+        // Update timestamps to prevent rapid refreshing
+        lastRefreshTime = currentTime;
+        
         const activeWorkType = document.querySelector('.type-btn.active').dataset.type;
-        loadContacts(activeWorkType); // Refresh data
+        
+        // Add loading state
+        const loadingOverlay = document.createElement('div');
+        loadingOverlay.className = 'loading-overlay';
+        loadingOverlay.innerHTML = '<div class="loader"></div>';
+        contactsGrid.appendChild(loadingOverlay);
+        
+        // Use Promise to handle the refresh
+        refreshContacts(activeWorkType)
+            .finally(() => {
+                // Clean up refresh state
+                contactsGrid.classList.remove('refreshing');
+                contactsGrid.classList.remove('is-refreshing');
+                isRefreshing = false;
+                
+                // Remove indicators with smooth animation
+                if (indicator) {
+                    indicator.style.transform = 'translateY(-30px)';
+                    indicator.style.opacity = '0';
+                    setTimeout(() => indicator.remove(), 300);
+                }
+                
+                // Remove loading overlay
+                loadingOverlay.remove();
+            });
+    } else if (indicator) {
+        // Just remove the indicator if not refreshing
+        indicator.style.transform = 'translateY(-30px)';
+        indicator.style.opacity = '0';
+        setTimeout(() => indicator.remove(), 300);
+        contactsGrid.classList.remove('refreshing');
     }
+    
+    // Reset variables
+    initialTouchY = 0;
 });
+
+// Add a new function to refresh contacts that returns a Promise
+function refreshContacts(workType) {
+    return new Promise((resolve, reject) => {
+        try {
+            // First, get the contacts initially without a listener
+            const contactsRef = collection(db, 'contacts');
+            const q = query(
+                contactsRef,
+                where('assignedTo', '==', currentUser.uid),
+                where('workType', '==', workType)
+            );
+            
+            getDocs(q)
+                .then(snapshot => {
+                    // Calculate counts for filter
+                    const counts = calculateCounts(snapshot.docs);
+                    
+                    // Update filter dropdown
+                    updateFilterDropdown(counts, snapshot.docs.length, workType);
+                    
+                    // Render contacts
+                    renderContacts(snapshot.docs, workType);
+                    
+                    resolve();
+                })
+                .catch(error => {
+                    console.error("Error refreshing contacts:", error);
+                    reject(error);
+                });
+        } catch (error) {
+            console.error("Error in refresh:", error);
+            reject(error);
+        }
+    });
+}
 
 // Add touch feedback to buttons
 document.querySelectorAll('.action-btn').forEach(btn => {
@@ -763,3 +887,64 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// Add these styles at the end of the file
+const pullToRefreshStyles = document.createElement('style');
+pullToRefreshStyles.textContent = `
+    .pull-indicator {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        padding: 10px;
+        color: var(--text-secondary);
+        transform: translateY(-30px);
+        opacity: 0;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+        z-index: 10;
+        pointer-events: none;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+    
+    .pull-indicator i {
+        animation: spin 1s linear infinite;
+    }
+    
+    .contacts-grid {
+        position: relative;
+        min-height: 200px;
+    }
+    
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+    }
+    
+    [data-theme="dark"] .loading-overlay {
+        background: rgba(0, 0, 0, 0.5);
+    }
+    
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    
+    .contacts-grid.is-refreshing {
+        pointer-events: none;
+    }
+`;
+
+document.head.appendChild(pullToRefreshStyles);
