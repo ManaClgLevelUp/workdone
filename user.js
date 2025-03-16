@@ -29,7 +29,7 @@ const statusFilter = document.getElementById('statusFilter');
 const contactsData = document.getElementById('contactsData');
 const themeToggle = document.getElementById('themeToggle');
 
-const contactsGrid = document.getElementById('contactsData');
+let contactsGrid = document.getElementById('contactsData');
 
 let currentUser = null;
 let currentContactId = null;
@@ -810,9 +810,8 @@ function cleanupListeners() {
 }
 
 // Remove or comment out old scroll-based listeners:
-contactsGrid.removeEventListener('scroll', handleScrollReload);
+// contactsGrid.removeEventListener('scroll', handleScrollReload);  // handleScrollReload is not defined
 // or remove entire lines if any were directly binding scroll events
-
 // Replace the touchmove and touchend event listeners with versions that don't react to normal scrolling
 contactsGrid.removeEventListener('touchmove', contactsGrid._touchmoveListener);
 contactsGrid.removeEventListener('touchend', contactsGrid._touchendListener);
@@ -1144,13 +1143,11 @@ function addManualRefreshButton() {
 document.addEventListener('DOMContentLoaded', function() {
     // Make sure we don't have any scroll event handlers
     if (contactsGrid) {
-        // Clone to remove any existing listeners
-        const newContactsGrid = contactsGrid.cloneNode(true);
-        contactsGrid.parentNode.replaceChild(newContactsGrid, contactsGrid);
-        
-        // Update references
-        window.contactsData = document.getElementById('contactsData');
-        contactsGrid = document.getElementById('contactsData');
+        // Comment out the lines below:
+        // const newContactsGrid = contactsGrid.cloneNode(true);
+        // contactsGrid.parentNode.replaceChild(newContactsGrid, contactsGrid);
+        // window.contactsData = document.getElementById('contactsData');
+        // contactsGrid = document.getElementById('contactsData');
         
         // Add only the manual refresh button
         addManualRefreshButton();
@@ -1178,3 +1175,8 @@ function refreshContacts(workType) {
             .catch(reject);
     });
 }
+
+// Add these global declarations at the top (e.g., after variable declarations)
+let initialTouchY = 0;
+let touchStartY = 0;
+let refreshThreshold = 50; // adjust as needed

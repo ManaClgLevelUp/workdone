@@ -416,6 +416,7 @@ header {
     display: flex;
     align-items: center;
     gap: 5px;
+    margin: 6px 0;
 }
 
 .contact-lastupdate::before {
@@ -442,6 +443,7 @@ header {
     padding-right: 2.5rem;
     cursor: pointer;
     transition: all 0.25s ease;
+    margin-top: 6px;
 }
 
 .contact-status select:hover {
@@ -767,4 +769,16 @@ header {
         margin: 10px 0 20px;
         padding: 0 20px;
     }
+}
+
+/* Add animation for "Last updated" text */
+@keyframes highlight-update {
+    0% { color: var(--primary-color); font-weight: bold; }
+    100% { color: var(--text-secondary); font-weight: normal; }
+}
+
+.contact-lastupdate.just-updated {
+    animation: highlight-update 2s ease-out;
+    color: var(--primary-color);
+    font-weight: bold;
 }
