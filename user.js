@@ -419,10 +419,9 @@ function renderContacts(docs, workType) {
                 <div class="contact-notes">
                     <textarea class="notes-textarea" 
                             placeholder="Add notes here..."
-                            oninput="window.handleNotesInput(this, '${doc.id}')"
                             onfocus="this.readOnly = false"
-                            onblur="this.readOnly = true"
-                            >${data.notes || ''}</textarea>
+                            onblur="window.handleNotesBlur(this, '${doc.id}'); this.readOnly = true;"
+                            readOnly="true">${data.notes || ''}</textarea>
                 </div>
                 
                 <div class="contact-lastupdate">
@@ -486,6 +485,31 @@ window.updateStatus = async (contactId, newStatus) => {
 
     } catch (error) {
         alert('Error updating status: ' + error.message);
+    }
+};
+
+// Add this new function for handling the blur event on notes
+window.handleNotesBlur = async (textarea, contactId) => {
+    try {
+        // Only update if the value has changed
+        const contactRef = doc(db, 'contacts', contactId);
+        const contactDoc = await getDoc(contactRef);
+        
+        if (contactDoc.exists() && contactDoc.data().notes !== textarea.value) {
+            await updateDoc(contactRef, {
+                notes: textarea.value,
+                lastUpdated: serverTimestamp()
+            });
+            
+            // Update the last updated text in the UI immediately
+            const card = textarea.closest('.contact-card');
+            const lastUpdateEl = card.querySelector('.contact-lastupdate');
+            if (lastUpdateEl) {
+                lastUpdateEl.textContent = 'Last updated: just now';
+            }
+        }
+    } catch (error) {
+        alert('Error saving notes: ' + error.message);
     }
 };
 
@@ -571,3 +595,42 @@ if (themeToggle) {
         updateThemeIcon(newTheme);
     });
 }
+
+// Helper function for updating contact status and refreshing UI
+async function updateContactStatus(contactId, updates) {
+    try {
+        await updateDoc(doc(db, 'contacts', contactId), updates);
+        
+        // Update the UI to show "Last updated: just now"
+        const contactCard = document.querySelector(`.contact-card[data-id="${contactId}"]`);
+        if (contactCard) {
+            const lastUpdateEl = contactCard.querySelector('.contact-lastupdate');
+            if (lastUpdateEl) {
+                lastUpdateEl.textContent = 'Last updated: just now';
+            }
+        }
+    } catch (error) {
+        console.error('Error updating contact:', error);
+    }
+}
+
+// Update the makeCall function
+window.makeCall = async (contactId, phone) => {
+    const formattedPhone = formatPhoneNumber(phone);
+    window.location.href = `tel:${formattedPhone}`;
+    await updateContactStatus(contactId, {
+        callTime: serverTimestamp(),
+        lastUpdated: serverTimestamp()
+    });
+};
+
+window.sendWhatsApp = async (contactId, phone) => {
+    const formattedPhone = formatPhoneNumber(phone);
+    // Remove '+' for WhatsApp URL
+    const whatsappNumber = formattedPhone.startsWith('+') ? formattedPhone.substring(1) : formattedPhone;
+    window.open(`https://wa.me/${whatsappNumber}`, '_blank');
+    await updateContactStatus(contactId, {
+        whatsappTime: serverTimestamp(),
+        lastUpdated: serverTimestamp()
+    });
+};

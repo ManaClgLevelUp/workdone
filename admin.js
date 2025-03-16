@@ -689,7 +689,7 @@ progressWorkType.addEventListener('change', setupProgressListener);
 
 window.adminMakeCall = async (contactId, phone) => {
     window.location.href = `tel:+${phone}`;
-    await updateDoc(doc(db, 'contacts', contactId), {
+    await updateAdminContactStatus(contactId, {
         adminCallTime: serverTimestamp(),
         lastUpdated: serverTimestamp()
     });
@@ -698,7 +698,7 @@ window.adminMakeCall = async (contactId, phone) => {
 window.adminSendWhatsApp = async (contactId, phone) => {
     const formattedPhone = phone.startsWith('+') ? phone.substring(1) : phone;
     window.open(`https://wa.me/91${formattedPhone}`, '_blank');
-    await updateDoc(doc(db, 'contacts', contactId), {
+    await updateAdminContactStatus(contactId, {
         adminWhatsappTime: serverTimestamp(),
         lastUpdated: serverTimestamp()
     });
@@ -2559,3 +2559,39 @@ document.querySelectorAll('style').forEach(style => {
     }
 });
 document.head.appendChild(bulkActionStyles);
+
+// Add this helper function 
+async function updateAdminContactStatus(contactId, updates) {
+    try {
+        await updateDoc(doc(db, 'contacts', contactId), updates);
+        
+        // Update the UI to show "Last updated: just now"
+        const contactRow = document.querySelector(`tr[data-contactid="${contactId}"]`);
+        if (contactRow) {
+            const lastUpdateCell = contactRow.querySelector('td:nth-last-child(2)');
+            if (lastUpdateCell) {
+                lastUpdateCell.textContent = 'Last updated: just now';
+            }
+        }
+    } catch (error) {
+        console.error('Error updating contact:', error);
+    }
+}
+
+// Update the adminMakeCall function
+window.adminMakeCall = async (contactId, phone) => {
+    window.location.href = `tel:+${phone}`;
+    await updateAdminContactStatus(contactId, {
+        adminCallTime: serverTimestamp(),
+        lastUpdated: serverTimestamp()
+    });
+};
+
+window.adminSendWhatsApp = async (contactId, phone) => {
+    const formattedPhone = phone.startsWith('+') ? phone.substring(1) : phone;
+    window.open(`https://wa.me/91${formattedPhone}`, '_blank');
+    await updateAdminContactStatus(contactId, {
+        adminWhatsappTime: serverTimestamp(),
+        lastUpdated: serverTimestamp()
+    });
+};

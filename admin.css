@@ -1365,3 +1365,91 @@ tr:hover {
         grid-template-columns: 1fr;
     }
 }
+
+/* Dark mode specific styles for input elements */
+[data-theme="dark"] textarea,
+[data-theme="dark"] select,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="tel"],
+[data-theme="dark"] input[type="email"],
+[data-theme="dark"] input[type="password"],
+[data-theme="dark"] input[type="date"] {
+    color: #e0e0e0;
+    background-color: #333;
+    border-color: #555;
+}
+
+[data-theme="dark"] textarea::placeholder,
+[data-theme="dark"] select::placeholder,
+[data-theme="dark"] input::placeholder {
+    color: #999;
+}
+
+/* Ensure dropdown options are visible in dark mode */
+[data-theme="dark"] select option {
+    background-color: #333;
+    color: #e0e0e0;
+}
+
+/* Fix specific status filter and notes textarea contrast */
+[data-theme="dark"] .status-filter,
+[data-theme="dark"] .status-header-filter,
+[data-theme="dark"] .notes-textarea,
+[data-theme="dark"] .bulk-status-select {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+}
+
+/* Additional style for highlighted dropdowns */
+[data-theme="dark"] select:focus {
+    outline-color: #4d90fe;
+    background-color: #3a3a3a;
+}
+
+/* Enhanced dark mode styles for input elements */
+[data-theme="dark"] textarea,
+[data-theme="dark"] select,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="tel"],
+[data-theme="dark"] input[type="email"],
+[data-theme="dark"] input[type="password"],
+[data-theme="dark"] input[type="date"] {
+    color: #e0e0e0 !important;
+    background-color: #333 !important;
+    border-color: #555;
+}
+
+/* More specific targeting for dropdown and textarea in work progress section */
+[data-theme="dark"] #statusFilter,
+[data-theme="dark"] #statusHeaderFilter,
+[data-theme="dark"] .status-filter,
+[data-theme="dark"] .status-header-filter,
+[data-theme="dark"] .bulk-status-select,
+[data-theme="dark"] #progressWorkType,
+[data-theme="dark"] #progressUser {
+    background-color: #2a2a2a !important;
+    color: #e0e0e0 !important;
+    border: 1px solid #444;
+}
+
+/* Specific notes textarea fix */
+[data-theme="dark"] .notes-textarea,
+[data-theme="dark"] td .notes-textarea {
+    background-color: #2a2a2a !important;
+    color: #e0e0e0 !important;
+    border: 1px solid #444;
+}
+
+/* Ensure dropdown options are visible */
+[data-theme="dark"] select option {
+    background-color: #333 !important;
+    color: #e0e0e0 !important;
+    padding: 8px;
+}
+
+/* Fix select focus state */
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+    outline-color: #4d90fe;
+    background-color: #3a3a3a !important;
+}

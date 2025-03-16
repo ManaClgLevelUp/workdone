@@ -394,3 +394,33 @@ th {
 [data-theme="dark"] .contact-lastupdate {
     color: var(--text-secondary);
 }
+
+/* Dark mode specific styles for input elements */
+[data-theme="dark"] .notes-textarea,
+[data-theme="dark"] select,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="tel"],
+[data-theme="dark"] input[type="email"],
+[data-theme="dark"] input[type="password"] {
+    color: #e0e0e0;
+    background-color: #333;
+    border-color: #555;
+}
+
+[data-theme="dark"] .notes-textarea::placeholder,
+[data-theme="dark"] select::placeholder,
+[data-theme="dark"] input::placeholder {
+    color: #999;
+}
+
+/* Ensure dropdown options are visible in dark mode */
+[data-theme="dark"] select option {
+    background-color: #333;
+    color: #e0e0e0;
+}
+
+/* Fix textarea contrast */
+[data-theme="dark"] .notes-textarea {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+}
