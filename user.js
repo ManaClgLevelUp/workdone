@@ -136,6 +136,9 @@ onAuthStateChanged(auth, async (user) => {
                 });
                 
                 initTheme();
+                
+                // Add after loading contacts
+                addManualRefreshButton();
             } else {
                 console.log('Not a valid user, redirecting to login');
                 await signOut(auth);
@@ -1020,33 +1023,20 @@ let loadCooldown = 1000; // 1 second cooldown between loads
 let currentWorkType = 'students'; // Track current work type
 let hasInitialLoad = false;
 let suppressNextVisibilityChange = false;
+let disableScrollLoading = true; // Add this flag to completely disable scroll-based loading
 
-// Fix handleVisibilityChange to be smarter about when to reload
+// Replace handleVisibilityChange to prevent unnecessary reloads
 async function handleVisibilityChange() {
     if (document.visibilityState === 'hidden') {
         if (currentVisit) {
             await logPageVisit('closed');
         }
     } else if (document.visibilityState === 'visible') {
-        // Only do a complete reload if it's been a while since our last load
-        const now = Date.now();
         if (!currentVisit) {
             await logPageVisit('opened');
-            
-            // Only reload data if it's been more than 30 seconds since last load
-            // This prevents unnecessary reloads when quickly switching tabs
-            if (now - lastLoadTime > 30000 && !suppressNextVisibilityChange) {
-                if (!isDataLoading) {
-                    console.log("Visibility changed to visible - reloading data");
-                    loadContacts(currentWorkType);
-                }
-            } else {
-                console.log("Visibility changed but skipping reload (recently loaded)");
-            }
+            // Do NOT trigger a reload when the page becomes visible again
+            // The user will need to manually refresh if they want updated data
         }
-        
-        // Reset the suppression flag
-        suppressNextVisibilityChange = false;
     }
 }
 
@@ -1059,26 +1049,181 @@ function cleanupListeners() {
     }
 }
 
-// Improved refresh contacts function
-function refreshContacts(workType) {
-    return new Promise((resolve, reject) => {
-        // Don't refresh if we're already loading
-        if (isDataLoading) {
-            console.log("Skipping refresh - load already in progress");
-            resolve();
-            return;
+// Replace the touchmove and touchend event listeners with versions that don't react to normal scrolling
+contactsGrid.removeEventListener('touchmove', contactsGrid._touchmoveListener);
+contactsGrid.removeEventListener('touchend', contactsGrid._touchendListener);
+
+// Only keep the pull-to-refresh functionality (deliberate action at the top)
+contactsGrid.addEventListener('touchstart', (e) => {
+    // Only initiate if we're at the very top of the scroll area and specifically pulling down
+    if (contactsGrid.scrollTop === 0) {
+        initialTouchY = e.touches[0].clientY;
+        touchStartY = initialTouchY;
+    } else {
+        // Reset to prevent accidental triggers during normal scrolling
+        initialTouchY = 0;
+    }
+});
+
+// Replace the touchmove listener with a more restrictive version
+contactsGrid._touchmoveListener = (e) => {
+    // Only process pull-to-refresh if we started at the top and it's a deliberate pull
+    if (initialTouchY === 0 || isRefreshing) return;
+    
+    const touchY = e.touches[0].clientY;
+    const diff = touchY - touchStartY;
+    
+    // Only react if it's a significant downward pull and we're at the top
+    if (diff > refreshThreshold && contactsGrid.scrollTop === 0) {
+        // This is definitely a pull-to-refresh gesture
+        contactsGrid.classList.add('refreshing');
+        
+        // Create and show pull indicator
+        let indicator = document.querySelector('.pull-indicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.className = 'pull-indicator';
+            indicator.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Releasing will refresh...';
+            contactsGrid.prepend(indicator);
+        }
+        indicator.style.transform = `translateY(${Math.min(diff/2, 70)}px)`;
+        indicator.style.opacity = Math.min(diff / 100, 1);
+        
+        e.preventDefault(); // Prevent scrolling when pulling down
+    }
+};
+contactsGrid.addEventListener('touchmove', contactsGrid._touchmoveListener);
+
+// Replace the touchend listener
+contactsGrid._touchendListener = (e) => {
+    const indicator = document.querySelector('.pull-indicator');
+    
+    // Only process as a refresh if it was marked as a refresh action
+    if (contactsGrid.classList.contains('refreshing') && !isRefreshing) {
+        isRefreshing = true;
+        
+        if (indicator) {
+            indicator.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Refreshing...';
+            indicator.style.transform = 'translateY(20px)';
         }
         
-        console.log("Manual refresh requested");
+        const activeWorkType = document.querySelector('.type-btn.active').dataset.type;
         
-        // Force a clean load by clearing the listener and setting a flag
+        // Manually refresh (this is a deliberate user action)
+        refreshContacts(activeWorkType)
+            .finally(() => {
+                // Clean up refresh state
+                contactsGrid.classList.remove('refreshing');
+                isRefreshing = false;
+                
+                // Clean up indicator
+                if (indicator) {
+                    indicator.style.transform = 'translateY(-30px)';
+                    indicator.style.opacity = '0';
+                    setTimeout(() => indicator.remove(), 300);
+                }
+            });
+    } else if (indicator) {
+        // Just remove the indicator if not refreshing
+        indicator.style.transform = 'translateY(-30px)';
+        indicator.style.opacity = '0';
+        setTimeout(() => indicator.remove(), 300);
+        contactsGrid.classList.remove('refreshing');
+    }
+    
+    // Reset variables
+    initialTouchY = 0;
+};
+contactsGrid.addEventListener('touchend', contactsGrid._touchendListener);
+
+// Modify loadContacts to use a one-time fetch instead of a listener when appropriate
+async function loadContacts(workType) {
+    // Prevent concurrent loads and throttle requests
+    const now = Date.now();
+    if (isDataLoading || (now - lastLoadTime < loadCooldown && hasInitialLoad)) {
+        console.log("Skipping load - already in progress or too recent");
+        return;
+    }
+    
+    isDataLoading = true;
+    lastLoadTime = now;
+    
+    console.log(`Loading contacts for work type: ${workType}`);
+    
+    // Show a loading indicator only if this is the first load
+    if (!hasInitialLoad) {
+        contactsData.innerHTML = '<div class="loading-indicator"><i class="fas fa-spinner fa-spin"></i> Loading contacts...</div>';
+    }
+
+    try {
+        // Clean up any existing listener first
         cleanupListeners();
         
-        // Load fresh data
-        loadContacts(workType)
-            .then(resolve)
-            .catch(reject);
-    });
+        // Get contacts directly without setting up a continuous listener
+        const contactsRef = collection(db, 'contacts');
+        const q = query(
+            contactsRef,
+            where('assignedTo', '==', currentUser.uid),
+            where('workType', '==', workType)
+        );
+        
+        // Get contacts with a single query instead of a real-time listener
+        const snapshot = await getDocs(q);
+        
+        // Calculate counts
+        const counts = calculateCounts(snapshot.docs);
+        
+        // Update filter dropdown
+        updateFilterDropdown(counts, snapshot.docs.length, workType);
+        
+        // Render contacts
+        renderContacts(snapshot.docs, workType);
+        hasInitialLoad = true;
+        
+        // Instead of setting up a continuous listener, we'll only add a minimal one that
+        // fires for critical changes (added or removed contacts)
+        const unsubscribe = onSnapshot(
+            q, 
+            { includeMetadataChanges: false },
+            (updatedSnapshot) => {
+                // Only re-render if there are structural changes to the data
+                const changes = updatedSnapshot.docChanges();
+                
+                // Only process if there are added or removed documents
+                const hasStructuralChanges = changes.some(change => 
+                    change.type === 'added' || change.type === 'removed'
+                );
+                
+                if (hasStructuralChanges) {
+                    // This is a meaningful change - something was added or removed
+                    console.log("Contact list structure changed - updating UI");
+                    
+                    // Recalculate counts
+                    const newCounts = calculateCounts(updatedSnapshot.docs);
+                    updateFilterDropdown(newCounts, updatedSnapshot.docs.length, workType);
+                    
+                    // Fully render contacts when the structure changes
+                    renderContacts(updatedSnapshot.docs, workType);
+                }
+            },
+            (error) => {
+                console.error("Snapshot error:", error);
+                if (!hasInitialLoad) {
+                    contactsData.innerHTML = '<div class="error-message">Error loading contacts. Please try again later.</div>';
+                }
+            }
+        );
+        
+        window.currentUnsubscribe = unsubscribe;
+        
+    } catch (error) {
+        console.error("Error loading contacts:", error);
+        if (!hasInitialLoad) {
+            contactsData.innerHTML = '<div class="error-message">Error loading contacts. Please try again later.</div>';
+        }
+    } finally {
+        isDataLoading = false;
+    }
 }
 
 // Properly handle app lifecycle
@@ -1142,3 +1287,162 @@ window.updateStatus = async (contactId, newStatus) => {
         alert('Error updating status: ' + error.message);
     }
 };
+
+// Update the window.handleNotesBlur function to avoid unnecessary UI updates
+window.handleNotesBlur = async (textarea, contactId) => {
+    try {
+        // Get current notes from database
+        const contactRef = doc(db, 'contacts', contactId);
+        const contactDoc = await getDoc(contactRef);
+        
+        // Only update if the notes have actually changed
+        if (contactDoc.exists() && contactDoc.data().notes !== textarea.value) {
+            await updateDoc(contactRef, {
+                notes: textarea.value,
+                lastUpdated: serverTimestamp()
+            });
+            
+            // Update the last updated text in the UI directly
+            const card = textarea.closest('.contact-card');
+            const lastUpdateEl = card.querySelector('.contact-lastupdate');
+            if (lastUpdateEl) {
+                lastUpdateEl.textContent = 'Last updated: just now';
+            }
+        }
+    } catch (error) {
+        console.error('Error saving notes:', error);
+        alert('Error saving notes: ' + error.message);
+    }
+};
+
+// Add this style to show a manual refresh button at the top
+const refreshButtonStyle = document.createElement('style');
+refreshButtonStyle.textContent = `
+    .manual-refresh-container {
+        display: flex;
+        justify-content: center;
+        margin: 10px 0 20px;
+    }
+    
+    .manual-refresh-btn {
+        padding: 10px 20px;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        transition: all 0.2s ease;
+    }
+    
+    .manual-refresh-btn:hover {
+        background-color: var(--primary-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    .manual-refresh-btn:active {
+        transform: translateY(0);
+    }
+    
+    .manual-refresh-btn.loading {
+        opacity: 0.8;
+        cursor: not-allowed;
+    }
+    
+    .manual-refresh-btn.loading i {
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+`;
+document.head.appendChild(refreshButtonStyle);
+
+// Function to add the manual refresh button to the UI
+function addManualRefreshButton() {
+    // Check if it already exists
+    if (document.querySelector('.manual-refresh-container')) {
+        return;
+    }
+    
+    const container = document.createElement('div');
+    container.className = 'manual-refresh-container';
+    
+    const refreshBtn = document.createElement('button');
+    refreshBtn.className = 'manual-refresh-btn';
+    refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Contacts';
+    
+    refreshBtn.addEventListener('click', async () => {
+        if (refreshBtn.classList.contains('loading')) return;
+        
+        // Show loading state
+        refreshBtn.classList.add('loading');
+        refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refreshing...';
+        
+        try {
+            // Get current work type
+            const activeWorkType = document.querySelector('.type-btn.active').dataset.type;
+            
+            // Refresh contacts
+            await refreshContacts(activeWorkType);
+            
+            // Show success briefly
+            refreshBtn.innerHTML = '<i class="fas fa-check"></i> Updated!';
+            
+            setTimeout(() => {
+                refreshBtn.classList.remove('loading');
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Contacts';
+            }, 1500);
+        } catch (error) {
+            console.error('Error refreshing contacts:', error);
+            
+            // Show error state
+            refreshBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+            
+            setTimeout(() => {
+                refreshBtn.classList.remove('loading');
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Contacts';
+            }, 2000);
+        }
+    });
+    
+    container.appendChild(refreshBtn);
+    
+    // Insert after the work type selector
+    const workTypeSelector = document.querySelector('.work-type-selector');
+    workTypeSelector.parentNode.insertBefore(container, workTypeSelector.nextSibling);
+}
+
+// Call this after initial load of contacts
+document.addEventListener('DOMContentLoaded', () => {
+    addManualRefreshButton();
+});
+
+// Improved refresh contacts function
+function refreshContacts(workType) {
+    return new Promise((resolve, reject) => {
+        // Don't refresh if we're already loading
+        if (isDataLoading) {
+            console.log("Skipping refresh - load already in progress");
+            resolve();
+            return;
+        }
+        
+        console.log("Manual refresh requested");
+        
+        // Force a clean load by clearing the listener and setting a flag
+        cleanupListeners();
+        
+        // Load fresh data
+        loadContacts(workType)
+            .then(resolve)
+            .catch(reject);
+    });
+}
