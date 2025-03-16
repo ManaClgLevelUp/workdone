@@ -817,87 +817,42 @@ contactsGrid.removeEventListener('touchmove', contactsGrid._touchmoveListener);
 contactsGrid.removeEventListener('touchend', contactsGrid._touchendListener);
 
 // Only keep the pull-to-refresh functionality (deliberate action at the top)
-contactsGrid.addEventListener('touchstart', (e) => {
-    // Only initiate if we're at the very top of the scroll area and specifically pulling down
-    if (contactsGrid.scrollTop === 0) {
-        initialTouchY = e.touches[0].clientY;
-        touchStartY = initialTouchY;
-    } else {
-        // Reset to prevent accidental triggers during normal scrolling
+// Disable pull-to-refresh and scroll-based contact reload functionality by removing touch event listeners:
+if (contactsGrid) {
+    // Comment out the pull-to-refresh code to prevent auto-reloading on scroll:
+    /*
+    contactsGrid.addEventListener('touchstart', (e) => {
+        if (contactsGrid.scrollTop === 0) {
+            initialTouchY = e.touches[0].clientY;
+            touchStartY = initialTouchY;
+        } else {
+            initialTouchY = 0;
+        }
+    });
+    
+    contactsGrid._touchmoveListener = (e) => {
+        if (initialTouchY === 0 || isRefreshing) return;
+        const touchY = e.touches[0].clientY;
+        const diff = touchY - touchStartY;
+        if (diff > refreshThreshold && contactsGrid.scrollTop === 0) {
+            contactsGrid.classList.add('refreshing');
+            // Optional pull indicator code...
+            e.preventDefault();
+        }
+    };
+    contactsGrid.addEventListener('touchmove', contactsGrid._touchmoveListener);
+    
+    contactsGrid._touchendListener = (e) => {
+        const indicator = document.querySelector('.pull-indicator');
+        if (contactsGrid.classList.contains('refreshing') && !isRefreshing) {
+            isRefreshing = true;
+            // Optional refreshContacts trigger...
+        }
         initialTouchY = 0;
-    }
-});
-
-// Replace the touchmove listener with a more restrictive version
-contactsGrid._touchmoveListener = (e) => {
-    // Only process pull-to-refresh if we started at the top and it's a deliberate pull
-    if (initialTouchY === 0 || isRefreshing) return;
-    
-    const touchY = e.touches[0].clientY;
-    const diff = touchY - touchStartY;
-    
-    // Only react if it's a significant downward pull and we're at the top
-    if (diff > refreshThreshold && contactsGrid.scrollTop === 0) {
-        // This is definitely a pull-to-refresh gesture
-        contactsGrid.classList.add('refreshing');
-        
-        // Create and show pull indicator
-        let indicator = document.querySelector('.pull-indicator');
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.className = 'pull-indicator';
-            indicator.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Releasing will refresh...';
-            contactsGrid.prepend(indicator);
-        }
-        indicator.style.transform = `translateY(${Math.min(diff/2, 70)}px)`;
-        indicator.style.opacity = Math.min(diff / 100, 1);
-        
-        e.preventDefault(); // Prevent scrolling when pulling down
-    }
-};
-contactsGrid.addEventListener('touchmove', contactsGrid._touchmoveListener);
-
-// Replace the touchend listener
-contactsGrid._touchendListener = (e) => {
-    const indicator = document.querySelector('.pull-indicator');
-    
-    // Only process as a refresh if it was marked as a refresh action
-    if (contactsGrid.classList.contains('refreshing') && !isRefreshing) {
-        isRefreshing = true;
-        
-        if (indicator) {
-            indicator.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Refreshing...';
-            indicator.style.transform = 'translateY(20px)';
-        }
-        
-        const activeWorkType = document.querySelector('.type-btn.active').dataset.type;
-        
-        // Manually refresh (this is a deliberate user action)
-        refreshContacts(activeWorkType)
-            .finally(() => {
-                // Clean up refresh state
-                contactsGrid.classList.remove('refreshing');
-                isRefreshing = false;
-                
-                // Clean up indicator
-                if (indicator) {
-                    indicator.style.transform = 'translateY(-30px)';
-                    indicator.style.opacity = '0';
-                    setTimeout(() => indicator.remove(), 300);
-                }
-            });
-    } else if (indicator) {
-        // Just remove the indicator if not refreshing
-        indicator.style.transform = 'translateY(-30px)';
-        indicator.style.opacity = '0';
-        setTimeout(() => indicator.remove(), 300);
-        contactsGrid.classList.remove('refreshing');
-    }
-    
-    // Reset variables
-    initialTouchY = 0;
-};
-contactsGrid.addEventListener('touchend', contactsGrid._touchendListener);
+    };
+    contactsGrid.addEventListener('touchend', contactsGrid._touchendListener);
+    */
+}
 
 // Replace loadContacts function with a version that only loads once and doesn't react to scroll
 async function loadContacts(workType) {
@@ -990,10 +945,11 @@ window.updateStatus = async (contactId, newStatus) => {
         // Update the UI immediately without waiting for the snapshot
         updateContactCardStatus(contactCard, newStatus);
         
-        // Update the "Last updated" text
+        // Update the "Last updated" text with the actual timestamp
         const lastUpdateEl = contactCard.querySelector('.contact-lastupdate');
         if (lastUpdateEl) {
-            lastUpdateEl.textContent = 'Last updated: just now';
+            const now = new Date();
+            lastUpdateEl.textContent = 'Last updated: ' + now.toLocaleString();
         }
         
     } catch (error) {
