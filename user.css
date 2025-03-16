@@ -203,6 +203,9 @@ header {
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 24px;
     padding: 10px 5px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* For smooth scrolling on iOS */
+    padding-bottom: 30px;
 }
 
 .contact-card {
@@ -658,4 +661,110 @@ header {
     margin-bottom: 1rem;
     opacity: 0.5;
     font-weight: 900;
+}
+
+/* Remove any pull-to-refresh styling */
+.pull-indicator {
+    display: none !important;
+}
+
+.refreshing {
+    /* Override any refresh-related styling */
+    transform: none !important;
+}
+
+/* Make the manual refresh button very prominent */
+.manual-refresh-container {
+    display: flex;
+    justify-content: center;
+    margin: 15px 0 25px;
+    padding: 10px;
+    animation: pulse-attention 2s infinite;
+}
+
+.manual-refresh-btn {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+    min-width: 200px;
+    justify-content: center;
+}
+
+.manual-refresh-btn i {
+    font-size: 18px;
+}
+
+.manual-refresh-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.25);
+}
+
+.manual-refresh-btn:active {
+    transform: translateY(0);
+}
+
+.manual-refresh-btn.loading {
+    opacity: 0.8;
+    cursor: not-allowed;
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+}
+
+@keyframes pulse-attention {
+    0% { opacity: 1; }
+    50% { opacity: 0.85; }
+    100% { opacity: 1; }
+}
+
+/* Loading indicator when manually refreshing */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.loading-indicator {
+    background: var(--surface-color);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: var(--text-primary);
+}
+
+.loading-indicator i {
+    font-size: 24px;
+    color: var(--primary-color);
+}
+
+/* Mobile specific styles */
+@media (max-width: 768px) {
+    .manual-refresh-btn {
+        width: 100%;
+        padding: 15px;
+        font-size: 16px;
+    }
+    
+    .manual-refresh-container {
+        margin: 10px 0 20px;
+        padding: 0 20px;
+    }
 }
