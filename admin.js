@@ -516,17 +516,6 @@ addBulkContacts.addEventListener('click', async () => {
 });
 
 // Load Users
-async function loadUsers() {
-    const q = query(collection(db, 'users'), where('role', '==', 'user'));
-    const snapshot = await getDocs(q);
-    const usersHtml = snapshot.docs.map(doc =>
-        `<option value="${doc.id}">${doc.data().name}</option>`
-    ).join('');
-
-    selectUser.innerHTML = '<option value="">Select User</option>' + usersHtml;
-    progressUser.innerHTML = selectUser.innerHTML;
-}
-
 
 // Add inline editing functions to window object
 window.toggleEdit = (button) => {
@@ -1785,107 +1774,6 @@ function resetActivityDisplays() {
     if (elements.completionRate) elements.completionRate.textContent = '-';
 }
 
-// Add these functions after your existing code
-
-// Add function to load existing users with inline editing
-// async function loadExistingUsers() {
-//     const q = query(collection(db, 'users'), where('role', '==', 'user'));
-//     const snapshot = await getDocs(q);
-    
-//     const html = `
-//         <div class="section-wrapper">
-//             <div class="table-container">
-//                 <table class="users-table">
-//                     <thead>
-//                         <tr>
-//                             <th style="width: 50px;">
-//                                 <input type="checkbox" id="selectAllUsers" class="select-all">
-//                             </th>
-//                             <th>Name</th>
-//                             <th>Phone</th>
-//                             <th>Email</th>
-//                             <th>Actions</th>
-//                         </tr>
-//                     </thead>
-//                     <tbody>
-//                         ${snapshot.docs.map(doc => {
-//                             const data = doc.data();
-//                             return `
-//                                 <tr data-userid="${doc.id}">
-//                                     <td><input type="checkbox" class="user-checkbox" data-userid="${doc.id}"></td>
-//                                     <td><input type="text" class="inline-edit name" value="${data.name || ''}" readonly></td>
-//                                     <td><input type="tel" class="inline-edit phone" value="${data.phone || ''}" readonly></td>
-//                                     <td><input type="email" class="inline-edit email" value="${data.email || ''}" readonly></td>
-//                                     <td>
-//                                         <div class="action-buttons">
-//                                             <button class="action-btn edit-user-btn" onclick="window.toggleEdit(this)">
-//                                                 <i class="fas fa-edit"></i>
-//                                             </button>
-//                                             <button class="action-btn save-user-btn" onclick="window.saveChanges(this)" style="display: none;">
-//                                                 <i class="fas fa-save"></i>
-//                                             </button>
-//                                             <button class="action-btn delete-user-btn" onclick="window.deleteUser('${doc.id}')">
-//                                                 <i class="fas fa-trash"></i>
-//                                             </button>
-//                                         </div>
-//                                     </td>
-//                                 </tr>
-//                             `;
-//                         }).join('')}
-//                     </tbody>
-//                 </table>
-//             </div>
-//             <div class="bulk-actions">
-//                 <button id="deleteSelectedUsers" class="danger-btn" style="display: none;">Delete Selected Users</button>
-//             </div>
-//         </div>
-//     `;
-
-//     usersList.innerHTML = html;
-//     initCheckboxHandlers('user');
-    
-//     // Add bulk delete handler
-//     const deleteSelectedBtn = document.getElementById('deleteSelectedUsers');
-//     deleteSelectedBtn?.addEventListener('click', async () => {
-//         const selectedUsers = Array.from(document.querySelectorAll('.user-checkbox:checked'))
-//             .map(checkbox => checkbox.dataset.userid);
-        
-//         if (selectedUsers.length === 0) {
-//             alert('Please select users to delete');
-//             return;
-//         }
-
-//         if (!confirm(`Are you sure you want to delete ${selectedUsers.length} selected users? This cannot be undone.`)) {
-//             return;
-//         }
-
-//         try {
-//             // Show loading state
-//             deleteSelectedBtn.disabled = true;
-//             deleteSelectedBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-
-//             // Delete users in sequence to avoid overwhelming the system
-//             for (const userId of selectedUsers) {
-//                 await deleteUserAndAssociatedData(userId);
-//                 // Remove row from UI
-//                 const row = document.querySelector(`tr[data-userid="${userId}"]`);
-//                 if (row) row.remove();
-//             }
-
-//             // Refresh the users lists
-//             await loadUsers();
-//             alert('Selected users deleted successfully');
-//         } catch (error) {
-//             console.error('Error deleting users:', error);
-//             alert('Error deleting some users. Please try again.');
-//         } finally {
-//             // Reset button state
-//             deleteSelectedBtn.disabled = false;
-//             deleteSelectedBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Selected Users';
-//             updateDeleteButtonVisibility('user');
-//         }
-//     });
-// }
 
 // Update the styles for bulk actions
 const bulkActionsStyle = document.createElement('style');
@@ -1970,596 +1858,6 @@ document.querySelectorAll('style').forEach(style => {
 });
 document.head.appendChild(bulkActionsStyle);
 
-// Modify updateContactsList to include checkboxes
-async function updateContactsList(filterQuery) {
-    const snapshot = await getDocs(filterQuery);
-    
-    progressData.innerHTML = `
-        <div class="section-wrapper">
-            <div class="table-container">
-                <table class="contacts-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 50px;">
-                                <input type="checkbox" id="selectAllContacts" class="select-all">
-                            </th>
-                            <th>Contact Info</th>
-                            <th>Actions</th>
-                            <th>
-                                <select id="statusFilter" class="status-filter">
-                                    <option value="">All Status</option>
-                                    <option value="notCalled">Not Called</option>
-                                    <option value="answered">Answered</option>
-                                    <option value="notAnswered">Not Answered</option>
-                                    <option value="notInterested">Not Interested</option>
-                                    <option value="callLater">Call Later</option>
-                                    <option value="alreadyInCourse">Already in Course</option>
-                                </select>
-                            </th>
-                            <th>Notes</th>
-                            <th>Last Updated</th>
-                            <th>Manage</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${snapshot.docs.map(doc => {
-                            const data = doc.data();
-                            return `
-                                <tr data-contactid="${doc.id}">
-                                    <td><input type="checkbox" class="contact-checkbox" data-contactid="${doc.id}"></td>
-                                    <td>
-                                        <div class="contact-details">
-                                            <div class="contact-name">${data.name}</div>
-                                            <div class="contact-phone">${data.phone}</div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="action-buttons">
-                                            <button class="action-btn call-btn" onclick="window.adminMakeCall('${doc.id}', '${data.phone}')">
-                                                <i class="fas fa-phone"></i>
-                                            </button>
-                                            <button class="action-btn whatsapp-btn" onclick="window.adminSendWhatsApp('${doc.id}', '${data.phone}')">
-                                                <i class="fab fa-whatsapp"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <select class="status-select" onchange="window.updateContactStatus('${doc.id}', this.value)">
-                                            <option value="notCalled" ${data.status === 'notCalled' ? 'selected' : ''}>Not Called</option>
-                                            <option value="answered" ${data.status === 'answered' ? 'selected' : ''}>Answered</option>
-                                            <option value="notAnswered" ${data.status === 'notAnswered' ? 'selected' : ''}>Not Answered</option>
-                                            <option value="notInterested" ${data.status === 'notInterested' ? 'selected' : ''}>Not Interested</option>
-                                            <option value="callLater" ${data.status === 'callLater' ? 'selected' : ''}>Call Later</option>
-                                            <option value="alreadyInCourse" ${data.status === 'alreadyInCourse' ? 'selected' : ''}>Already in Course</option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <textarea class="notes-textarea" placeholder="Add notes..." onchange="window.updateContactNotes('${doc.id}', this.value)">${data.notes || ''}</textarea>
-                                    </td>
-                                    <td>${data.lastUpdated ? new Date(data.lastUpdated.toDate()).toLocaleString() : '-'}</td>
-                                    <td>
-                                        <div class="action-buttons">
-                                            <button class="action-btn edit-btn" onclick="window.toggleContactEdit('${doc.id}')">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button class="action-btn delete-btn" onclick="window.deleteContact('${doc.id}')">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-            <div class="bulk-actions">
-                <button id="deleteSelectedContacts" class="danger-btn" style="display: none;">
-                    <i class="fas fa-trash"></i> Delete Selected
-                    <span class="selected-count"></span>
-                </button>
-                <button id="updateSelectedStatus" class="update-btn" style="display: none;">
-                    <i class="fas fa-edit"></i> Update Status
-                    <select class="bulk-status-select">
-                        <option value="">Select Status</option>
-                        <option value="notCalled">Not Called</option>
-                        <option value="answered">Answered</option>
-                        <option value="notAnswered">Not Answered</option>
-                        <option value="notInterested">Not Interested</option>
-                        <option value="callLater">Call Later</option>
-                        <option value="alreadyInCourse">Already in Course</option>
-                    </select>
-                </button>
-            </div>
-        </div>
-    `;
-
-    // Add event listener for bulk status update
-    const bulkStatusSelect = document.querySelector('.bulk-status-select');
-    const updateSelectedBtn = document.getElementById('updateSelectedStatus');
-    
-    bulkStatusSelect?.addEventListener('change', async () => {
-        const selectedContacts = Array.from(document.querySelectorAll('.contact-checkbox:checked'))
-            .map(checkbox => checkbox.dataset.contactid);
-        
-        if (selectedContacts.length === 0 || !bulkStatusSelect.value) return;
-        
-        if (confirm(`Update status to "${bulkStatusSelect.value}" for ${selectedContacts.length} contacts?`)) {
-            try {
-                const batch = writeBatch(db);
-                selectedContacts.forEach(contactId => {
-                    batch.update(doc(db, 'contacts', contactId), {
-                        status: bulkStatusSelect.value,
-                        lastUpdated: serverTimestamp()
-                    });
-                });
-                await batch.commit();
-                
-                // Update UI
-                selectedContacts.forEach(contactId => {
-                    const statusSelect = document.querySelector(`tr[data-contactid="${contactId}"] .status-select`);
-                    if (statusSelect) statusSelect.value = bulkStatusSelect.value;
-                });
-                
-                alert('Status updated successfully');
-            } catch (error) {
-                console.error('Error updating status:', error);
-                alert('Error updating status');
-            }
-        }
-    });
-
-    // Add the status filter functionality
-    const statusFilter = document.getElementById('statusFilter');
-    statusFilter?.addEventListener('change', async () => {
-        const selectedStatus = statusFilter.value;
-        let filteredQuery = baseQuery;
-
-        if (selectedStatus) {
-            filteredQuery = query(
-                collection(db, 'contacts'),
-                where('assignedTo', '==', progressUser.value),
-                where('workType', '==', progressWorkType.value),
-                where('status', '==', selectedStatus)
-            );
-        }
-
-        await updateContactsList(filteredQuery);
-    });
-
-    initCheckboxHandlers('contact');
-
-    // Add style for the bulk actions and table
-    const style = document.createElement('style');
-    style.textContent = `
-        .bulk-actions {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            display: flex;
-            gap: 10px;
-            z-index: 1000;
-        }
-
-        .bulk-actions button {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            border-radius: 4px;
-            border: none;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        .danger-btn {
-            background: #dc3545;
-            color: white;
-        }
-
-        .update-btn {
-            background: #17a2b8;
-            color: white;
-        }
-
-        .bulk-status-select {
-            padding: 4px 8px;
-            border-radius: 4px;
-            border: 1px solid #ddd;
-            margin-left: 8px;
-        }
-
-        .status-filter {
-            width: 100%;
-            padding: 6px;
-            border-radius: 4px;
-            border: 1px solid #ddd;
-        }
-
-        .selected-count {
-            background: rgba(255,255,255,0.2);
-            padding: 2px 6px;
-            border-radius: 4px;
-            margin-left: 4px;
-        }
-
-        .contacts-table th {
-            position: sticky;
-            top: 0;
-            background: #f8f9fa;
-            z-index: 10;
-        }
-    `;
-    document.head.appendChild(style);
-
-    // Attach bulk delete handler for contacts
-    const deleteSelectedContactsBtn = document.getElementById('deleteSelectedContacts');
-    if (deleteSelectedContactsBtn) {
-        // Replace button node to clear previous listeners
-        const newBtn = deleteSelectedContactsBtn.cloneNode(true);
-        deleteSelectedContactsBtn.parentNode.replaceChild(newBtn, deleteSelectedContactsBtn);
-        newBtn.addEventListener('click', async () => {
-            const selectedContacts = Array.from(document.querySelectorAll('.contact-checkbox:checked'))
-                .map(cb => cb.dataset.contactid);
-            if (selectedContacts.length === 0) {
-                alert("Please select contacts to delete");
-                return;
-            }
-            if (!confirm(`Are you sure you want to delete ${selectedContacts.length} selected contact(s)? This action cannot be undone.`)) {
-                return;
-            }
-            try {
-                newBtn.disabled = true;
-                newBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-                // Delete contacts one by one
-                for (const contactId of selectedContacts) {
-                    await window.deleteContact(contactId);
-                }
-                alert("Selected contacts deleted successfully");
-            } catch (error) {
-                console.error("Error deleting contacts:", error);
-                alert("Error deleting contacts: " + error.message);
-            } finally {
-                newBtn.disabled = false;
-                newBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Selected';
-                updateDeleteButtonVisibility('contact');
-            }
-        });
-    }
-}
-
-// Update checkbox handlers
-
-// Add some CSS for the bulk actions
-const style = document.createElement('style');
-style.textContent = `
-    .section-wrapper {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-    }
-    .bulk-actions {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        background: #f5f5f5;
-        padding: 1rem;
-        border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .table-container {
-        overflow-x: auto;
-    }
-    .danger-btn {
-        background: #dc3545;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-    .danger-btn:hover {
-        background: #c82333;
-    }
-    .danger-btn:disabled {
-        background: #6c757d;
-        cursor: not-allowed;
-    }
-`;
-document.head.appendChild(style);
-
-// Add styles to head
-const bulkActionStyles = document.createElement('style');
-bulkActionStyles.textContent = `
-    .section-wrapper {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-    }
-    .bulk-actions {
-        margin: 10px 0;
-        padding: 10px;
-        background: #f5f5f5;
-        border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        position: sticky;
-        bottom: 0;
-        z-index: 1;
-    }
-    .table-container {
-        overflow-x: auto;
-        margin-bottom: 60px;
-    }
-    .danger-btn {
-        background: #dc3545;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-    .danger-btn:hover {
-        background: #c82333;
-    }
-    .danger-btn:disabled {
-        background: #6c757d;
-        cursor: not-allowed;
-    }
-`;
-document.head.appendChild(bulkActionStyles);
-
-// Remove any duplicate style elements
-document.querySelectorAll('style').forEach((style, index) => {
-    if (index > 0 && style.textContent.includes('.bulk-actions')) {
-        style.remove();
-    }
-});
-
-
-function updateDeleteButtonVisibility(type) {
-    const selectedCount = document.querySelectorAll(`.${type}-checkbox:checked`).length;
-    const deleteBtn = document.getElementById(`deleteSelected${type.charAt(0).toUpperCase() + type.slice(1)}s`);
-    const updateBtn = document.getElementById('updateSelectedStatus');
-    
-    if (deleteBtn) {
-        deleteBtn.style.display = selectedCount > 0 ? 'inline-flex' : 'none';
-        const countSpan = deleteBtn.querySelector('.selected-count');
-        if (countSpan) {
-            countSpan.textContent = `(${selectedCount})`;
-        } else {
-            deleteBtn.textContent = `Delete Selected ${type.charAt(0).toUpperCase() + type.slice(1)}s (${selectedCount})`;
-        }
-    }
-    
-    // Only show update status button for contacts
-    if (updateBtn && type === 'contact') {
-        updateBtn.style.display = selectedCount > 0 ? 'inline-flex' : 'none';
-    }
-}
-
-
-// Add checkbox event listeners
-function initCheckboxHandlers(type) {
-    const selectAllCheckbox = document.getElementById(`selectAll${type.charAt(0).toUpperCase() + type.slice(1)}s`);
-    const checkboxes = document.querySelectorAll(`.${type}-checkbox`);
-    
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', () => {
-            checkboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
-            updateDeleteButtonVisibility(type);
-        });
-    }
-
-    checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', () => updateDeleteButtonVisibility(type));
-    });
-}
-
-// Initialize the checkbox handlers
-document.addEventListener('DOMContentLoaded', () => {
-    initCheckboxHandlers('user');
-    initCheckboxHandlers('contact');
-});
-
-// Modify the addCheckboxesToTables function to only add headers if they don't exist
-function addCheckboxesToTables() {
-    // Add checkbox to contacts table header only if it doesn't exist
-    const existingContactHeader = document.querySelector('#progressData .select-all');
-    const contactTableHeader = document.querySelector('#progressData tr:first-child');
-    if (contactTableHeader && !existingContactHeader) {
-        const firstTh = contactTableHeader.querySelector('th:first-child');
-        if (firstTh) {
-            firstTh.innerHTML = '<input type="checkbox" id="selectAllContacts" class="select-all">';
-            
-            // Add event listener to new select all checkbox
-            document.getElementById('selectAllContacts').addEventListener('change', e => {
-                const checkboxes = document.querySelectorAll('.contact-checkbox');
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = e.target.checked;
-                });
-                updateDeleteButtonVisibility('contact');
-            });
-        }
-    }
-}
-
-// Update loadExistingUsers function with fixed bulk delete functionality
-async function loadExistingUsers() {
-    const q = query(collection(db, 'users'), where('role', '==', 'user'));
-    const snapshot = await getDocs(q);
-    
-    const html = `
-        <div class="section-wrapper">
-            <div class="table-container">
-                <table class="users-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 50px;">
-                                <input type="checkbox" id="selectAllUsers" class="select-all">
-                            </th>
-                            <th>Name</th>
-                            <th>Phone</th>
-                            <th>Email</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${snapshot.docs.map(doc => {
-                            const data = doc.data();
-                            return `
-                                <tr data-userid="${doc.id}">
-                                    <td><input type="checkbox" class="user-checkbox" data-userid="${doc.id}"></td>
-                                    <td><input type="text" class="inline-edit name" value="${data.name || ''}" readonly></td>
-                                    <td><input type="tel" class="inline-edit phone" value="${data.phone || ''}" readonly></td>
-                                    <td><input type="email" class="inline-edit email" value="${data.email || ''}" readonly></td>
-                                    <td>
-                                        <div class="action-buttons">
-                                            <button class="action-btn edit-user-btn" onclick="window.toggleEdit(this)">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button class="action-btn save-user-btn" onclick="window.saveChanges(this)" style="display: none;">
-                                                <i class="fas fa-save"></i>
-                                            </button>
-                                            <button class="action-btn delete-user-btn" onclick="window.deleteUser('${doc.id}')">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-            <div class="bulk-actions">
-                <button id="deleteSelectedUsers" class="danger-btn" style="display: none;">Delete Selected Users</button>
-            </div>
-        </div>
-    `;
-
-    usersList.innerHTML = html;
-    initCheckboxHandlers('user');
-    
-    // Fix bulk delete handler for users in work progress section
-    const deleteSelectedBtn = document.getElementById('deleteSelectedUsers');
-    // Replace the button element to clear any previous listeners
-    deleteSelectedBtn.replaceWith(deleteSelectedBtn.cloneNode(true));
-    const newDeleteSelectedBtn = document.getElementById('deleteSelectedUsers');
-    newDeleteSelectedBtn.addEventListener('click', async () => {
-        const selectedUsers = Array.from(document.querySelectorAll('.user-checkbox:checked'))
-            .map(checkbox => checkbox.dataset.userid);
-        
-        if (selectedUsers.length === 0) {
-            alert('Please select users to delete');
-            return;
-        }
-        
-        if (!confirm(`Are you sure you want to delete ${selectedUsers.length} selected user(s) and ALL their associated data? This cannot be undone.`)) {
-            return;
-        }
-        
-        try {
-            newDeleteSelectedBtn.disabled = true;
-            newDeleteSelectedBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-            
-            for (const userId of selectedUsers) {
-                await deleteUserAndAssociatedData(userId);
-                const row = document.querySelector(`tr[data-userid="${userId}"]`);
-                if (row) row.remove();
-            }
-            
-            // Refresh user lists
-            await Promise.all([loadUsers(), loadExistingUsers()]);
-            alert('Selected users deleted successfully');
-        } catch (error) {
-            console.error('Error deleting users:', error);
-            alert('Error deleting users: ' + error.message);
-        } finally {
-            newDeleteSelectedBtn.disabled = false;
-            newDeleteSelectedBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Selected Users';
-            updateDeleteButtonVisibility('user');
-        }
-    });
-}
-
-// Update bulk actions styling for better visibility
-// const bulkActionStyles = document.createElement('style');
-bulkActionStyles.textContent = `
-    .bulk-actions {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: #fff;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 3px 15px rgba(0,0,0,0.2);
-        display: flex;
-        gap: 10px;
-        z-index: 1000;
-        transition: all 0.3s ease;
-    }
-
-    .bulk-actions .danger-btn {
-        background: #dc3545;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 500;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        transition: all 0.3s ease;
-        min-width: 180px;
-        justify-content: center;
-    }
-
-    .bulk-actions .danger-btn:hover {
-        background: #c82333;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
-    }
-
-    .bulk-actions .danger-btn:active {
-        transform: translateY(0);
-    }
-
-    .bulk-actions .danger-btn:disabled {
-        background: #6c757d;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-    }
-
-    .bulk-actions .danger-btn i {
-        font-size: 1.1em;
-    }
-
-    .bulk-actions .selected-count {
-        background: rgba(255,255,255,0.2);
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 0.9em;
-        margin-left: 4px;
-    }
-`;
-
-// Remove any existing bulk actions styles and add the new one
-document.querySelectorAll('style').forEach(style => {
-    if (style.textContent.includes('.bulk-actions')) {
-        style.remove();
-    }
-});
-document.head.appendChild(bulkActionStyles);
-
 // Add this helper function 
 async function updateAdminContactStatus(contactId, updates) {
     try {
@@ -2595,3 +1893,566 @@ window.adminSendWhatsApp = async (contactId, phone) => {
         lastUpdated: serverTimestamp()
     });
 };
+
+// Add these functions after loadExistingUsers function
+
+// Function to handle user search in the Create User section
+function initUserSearch() {
+    const searchInput = document.getElementById('userSearchInput');
+    if (!searchInput) return;
+    
+    searchInput.addEventListener('input', debounce(function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        const userRows = document.querySelectorAll('.users-table tbody tr');
+        
+        // Skip header row if present
+        userRows.forEach(row => {
+            // Check if this is not a header row
+            if (!row.querySelector('th')) {
+                // Get all text content from the row's cells (name, phone, email)
+                const textContent = Array.from(row.querySelectorAll('input.inline-edit'))
+                    .map(input => input.value.toLowerCase())
+                    .join(' ');
+                
+                // Show/hide based on whether the search term is found in any cell
+                const isMatch = textContent.includes(searchTerm);
+                row.style.display = isMatch ? '' : 'none';
+            }
+        });
+        
+        // Show a message if no results
+        const visibleRows = document.querySelectorAll('.users-table tbody tr[style=""]');
+        const noResultsRow = document.querySelector('.no-results-row');
+        
+        if (searchTerm && visibleRows.length === 0) {
+            if (!noResultsRow) {
+                const tbody = document.querySelector('.users-table tbody');
+                const newRow = document.createElement('tr');
+                newRow.className = 'no-results-row';
+                newRow.innerHTML = `<td colspan="5" style="text-align: center; padding: 20px;">No users found matching "${searchTerm}"</td>`;
+                tbody.appendChild(newRow);
+            } else {
+                noResultsRow.style.display = '';
+                noResultsRow.querySelector('td').textContent = `No users found matching "${searchTerm}"`;
+            }
+        } else if (noResultsRow) {
+            noResultsRow.style.display = 'none';
+        }
+    }, 300));
+}
+
+// Function to initialize searchable select dropdowns
+function initSearchableSelects() {
+    const searchableSelects = document.querySelectorAll('.searchable-select');
+    
+    searchableSelects.forEach(select => {
+        const container = select.closest('.searchable-select-container');
+        const searchWrapper = container.querySelector('.select-search-wrapper');
+        const searchInput = container.querySelector('.select-search');
+        const optionsContainer = container.querySelector('.select-options');
+        
+        // When clicking on the select, show the search dropdown
+        select.addEventListener('click', () => {
+            // Close any other open dropdowns first
+            document.querySelectorAll('.searchable-select-container.active').forEach(activeContainer => {
+                if (activeContainer !== container) {
+                    activeContainer.classList.remove('active');
+                }
+            });
+            
+            container.classList.toggle('active');
+            if (container.classList.contains('active')) {
+                // Populate options
+                const options = Array.from(select.options).slice(1); // Skip the first "Select User" option
+                renderSelectOptions(optionsContainer, options, select.value);
+                searchInput.focus();
+                
+                // Position the dropdown properly
+                const selectRect = select.getBoundingClientRect();
+                searchWrapper.style.width = `${selectRect.width}px`;
+            }
+        });
+        
+        // Handle search input
+        searchInput.addEventListener('input', debounce(function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            const options = Array.from(select.options).slice(1);
+            const filteredOptions = options.filter(option => 
+                option.text.toLowerCase().includes(searchTerm)
+            );
+            renderSelectOptions(optionsContainer, filteredOptions, select.value);
+        }, 300));
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (event) => {
+            if (!container.contains(event.target)) {
+                container.classList.remove('active');
+            }
+        });
+    });
+}
+
+// Function to render options in the searchable dropdown
+function renderSelectOptions(container, options, selectedValue) {
+    container.innerHTML = '';
+    
+    if (options.length === 0) {
+        const noResults = document.createElement('div');
+        noResults.className = 'select-option';
+        noResults.textContent = 'No users found';
+        noResults.style.fontStyle = 'italic';
+        noResults.style.color = 'var(--text-secondary)';
+        container.appendChild(noResults);
+        return;
+    }
+    
+    options.forEach(option => {
+        const optionElement = document.createElement('div');
+        optionElement.className = 'select-option';
+        if (option.value === selectedValue) {
+            optionElement.classList.add('selected');
+        }
+        optionElement.textContent = option.text;
+        optionElement.addEventListener('click', () => {
+            const select = container.closest('.searchable-select-container').querySelector('select');
+            select.value = option.value;
+            
+            // Trigger change event
+            const event = new Event('change', { bubbles: true });
+            select.dispatchEvent(event);
+            
+            // Close dropdown
+            container.closest('.searchable-select-container').classList.remove('active');
+        });
+        container.appendChild(optionElement);
+    });
+}
+
+
+// Add a debounce function if you don't already have one
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func.apply(this, args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// ...existing code...
+
+// Make sure to call initUserSearch and initSearchableSelects after the respective DOM elements are populated
+document.addEventListener('DOMContentLoaded', () => {
+    // Your existing initialization code
+    
+    // These will be called later after user data is loaded
+    // initUserSearch();
+    // initSearchableSelects();
+});
+
+// Ensure we initialize search functionality when the admin state is loaded
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists() && userDoc.data().role === 'admin') {
+            // Existing admin authentication code
+            
+            // Load data and initialize search
+            await Promise.all([
+                loadExistingUsers(), // This will now call initUserSearch()
+                loadUsers() // This will now call initSearchableSelects()
+            ]);
+        } else {
+            // Not an admin, redirect
+        }
+    } else {
+        // Not logged in, redirect
+    }
+});
+
+// ...existing code...
+
+// Replace or update the loadUsers function
+async function loadUsers() {
+    try {
+        const q = query(collection(db, 'users'), where('role', '==', 'user'));
+        const snapshot = await getDocs(q);
+        const users = snapshot.docs.map(doc => ({
+            id: doc.id,
+            name: doc.data().name || ''
+        }));
+
+        // Sort users by name for easier selection
+        users.sort((a, b) => a.name.localeCompare(b.name));
+
+        // Populate the select dropdowns
+        const selectOptions = users.map(user => `<option value="${user.id}">${user.name}</option>`).join('');
+        const baseOption = '<option value="">Select User</option>';
+        
+        selectUser.innerHTML = baseOption + selectOptions;
+        progressUser.innerHTML = baseOption + selectOptions;
+        
+        // Initialize the searchable dropdowns
+        initSearchableDropdowns();
+    } catch (error) {
+        console.error('Error loading users:', error);
+    }
+}
+
+// Replace the existing initSearchableSelects with this new function
+function initSearchableDropdowns() {
+    const dropdowns = document.querySelectorAll('.searchable-dropdown');
+    
+    dropdowns.forEach(dropdown => {
+        const container = dropdown.closest('.searchable-dropdown-container');
+        
+        // Create dropdown menu element
+        const dropdownMenu = document.createElement('div');
+        dropdownMenu.className = 'dropdown-menu';
+        
+        // Create search box
+        const searchBox = document.createElement('input');
+        searchBox.type = 'text';
+        searchBox.className = 'search-box';
+        searchBox.placeholder = 'Search users...';
+        
+        // Create items container
+        const itemsContainer = document.createElement('div');
+        itemsContainer.className = 'dropdown-items';
+        
+        // Add to the DOM
+        dropdownMenu.appendChild(searchBox);
+        dropdownMenu.appendChild(itemsContainer);
+        container.appendChild(dropdownMenu);
+        
+        // Get all options from the select
+        const options = Array.from(dropdown.options).slice(1); // Skip the "Select User" option
+        
+        // Populate dropdown items
+        populateDropdownItems(itemsContainer, options, dropdown.value);
+        
+        // Toggle dropdown on select click - IMPROVED to prevent native dropdown
+        dropdown.addEventListener('click', (e) => {
+            // Prevent the default select dropdown
+            e.preventDefault();
+            
+            // Toggle our custom dropdown
+            const isActive = dropdownMenu.classList.contains('show');
+            
+            // Close all other dropdowns first
+            document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                if (menu !== dropdownMenu) {
+                    menu.classList.remove('show');
+                }
+            });
+            
+            if (isActive) {
+                dropdownMenu.classList.remove('show');
+            } else {
+                dropdownMenu.classList.add('show');
+                searchBox.focus();
+                positionDropdownMenu(dropdown, dropdownMenu);
+            }
+        });
+        
+        // Also prevent default on mousedown which is fired before click
+        dropdown.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+        });
+        
+        // Filter options on search
+        searchBox.addEventListener('input', () => {
+            const searchTerm = searchBox.value.toLowerCase().trim();
+            filterDropdownItems(itemsContainer, options, searchTerm, dropdown.value);
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!container.contains(e.target)) {
+                dropdownMenu.classList.remove('show');
+            }
+        });
+
+        // Prevent search box from closing the dropdown when clicked
+        searchBox.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    });
+}
+
+// Helper function to populate the dropdown items
+function populateDropdownItems(container, options, selectedValue) {
+    container.innerHTML = '';
+    
+    if (options.length === 0) {
+        const emptyItem = document.createElement('div');
+        emptyItem.className = 'dropdown-item';
+        emptyItem.textContent = 'No users found';
+        emptyItem.style.fontStyle = 'italic';
+        emptyItem.style.color = 'var(--text-secondary)';
+        container.appendChild(emptyItem);
+        return;
+    }
+    
+    options.forEach(option => {
+        const item = document.createElement('div');
+        item.className = 'dropdown-item';
+        if (option.value === selectedValue) {
+            item.classList.add('selected');
+        }
+        item.textContent = option.text;
+        item.dataset.value = option.value;
+        
+        item.addEventListener('click', () => {
+            const select = container.closest('.searchable-dropdown-container').querySelector('select');
+            select.value = option.value;
+            
+            // Update selected item styling
+            container.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+            
+            // Trigger change event
+            const event = new Event('change', { bubbles: true });
+            select.dispatchEvent(event);
+            
+            // Close dropdown
+            container.closest('.dropdown-menu').classList.remove('show');
+        });
+        
+        container.appendChild(item);
+    });
+}
+
+// Helper function to filter dropdown items
+function filterDropdownItems(container, options, searchTerm, selectedValue) {
+    const filteredOptions = options.filter(option => 
+        option.text.toLowerCase().includes(searchTerm)
+    );
+    
+    populateDropdownItems(container, filteredOptions, selectedValue);
+}
+
+// Helper function to position the dropdown menu
+function positionDropdownMenu(select, menu) {
+    const selectRect = select.getBoundingClientRect();
+    menu.style.minWidth = `${selectRect.width}px`;
+    
+    // Check if dropdown would go off bottom of viewport
+    const menuHeight = menu.offsetHeight;
+    const spaceBelow = window.innerHeight - selectRect.bottom;
+    
+    if (menuHeight > spaceBelow && selectRect.top > menuHeight) {
+        // Position above if there's more space
+        menu.style.top = 'auto';
+        menu.style.bottom = '100%';
+        menu.style.borderRadius = '8px 8px 0 0';
+    } else {
+        // Position below (default)
+        menu.style.top = '100%';
+        menu.style.bottom = 'auto';
+        menu.style.borderRadius = '0 0 8px 8px';
+    }
+}
+
+// Add this at the onAuthStateChanged or wherever appropriate
+// Make sure to initialize our dropdown functionality after loading users
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists() && userDoc.data().role === 'admin') {
+            // Existing admin authentication code
+            
+            // Load data and initialize UI components
+            await Promise.all([
+                loadExistingUsers(), 
+                loadUsers() // This will now initialize the searchable dropdowns
+            ]);
+        } else {
+            // Not an admin, redirect
+        }
+    } else {
+        // Not logged in, redirect
+    }
+});
+
+// ...existing code...
+
+// Add this function before loadExistingUsers
+function initCheckboxHandlers(type) {
+    const selectAllCheckbox = document.getElementById(`selectAll${type.charAt(0).toUpperCase() + type.slice(1)}s`);
+    const checkboxes = document.querySelectorAll(`.${type}-checkbox`);
+    const deleteSelectedBtn = document.getElementById(`deleteSelected${type.charAt(0).toUpperCase() + type.slice(1)}s`);
+    
+    if (!selectAllCheckbox || !deleteSelectedBtn) return;
+    
+    // Remove any existing event listeners by cloning elements
+    const newSelectAll = selectAllCheckbox.cloneNode(true);
+    selectAllCheckbox.parentNode.replaceChild(newSelectAll, selectAllCheckbox);
+    
+    // Handle "select all" checkbox
+    newSelectAll.addEventListener('change', () => {
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = newSelectAll.checked;
+        });
+        updateDeleteButtonVisibility(type);
+    });
+    
+    // Handle individual checkboxes
+    checkboxes.forEach(checkbox => {
+        // Remove any existing listeners by cloning
+        const newCheckbox = checkbox.cloneNode(true);
+        checkbox.parentNode.replaceChild(newCheckbox, checkbox);
+        
+        newCheckbox.addEventListener('change', () => {
+            // Update "select all" state
+            const allCheckboxes = document.querySelectorAll(`.${type}-checkbox`);
+            newSelectAll.checked = [...allCheckboxes].every(cb => cb.checked);
+            newSelectAll.indeterminate = !newSelectAll.checked && [...allCheckboxes].some(cb => cb.checked);
+            updateDeleteButtonVisibility(type);
+        });
+    });
+    
+    // Initialize visibility
+    updateDeleteButtonVisibility(type);
+}
+
+// Helper to show/hide delete button and update count
+function updateDeleteButtonVisibility(type) {
+    const checkboxes = document.querySelectorAll(`.${type}-checkbox:checked`);
+    const deleteSelectedBtn = document.getElementById(`deleteSelected${type.charAt(0).toUpperCase() + type.slice(1)}s`);
+    
+    if (deleteSelectedBtn) {
+        if (checkboxes.length > 0) {
+            deleteSelectedBtn.style.display = 'inline-flex';
+            const countSpan = deleteSelectedBtn.querySelector('.selected-count');
+            if (countSpan) {
+                countSpan.textContent = `(${checkboxes.length})`;
+            } else {
+                deleteSelectedBtn.textContent = `Delete Selected ${type.charAt(0).toUpperCase() + type.slice(1)}s (${checkboxes.length})`;
+            }
+        } else {
+            deleteSelectedBtn.style.display = 'none';
+        }
+    }
+}
+
+// Now the loadExistingUsers function will work correctly
+async function loadExistingUsers() {
+    try {
+        const q = query(collection(db, 'users'), where('role', '==', 'user'));
+        const snapshot = await getDocs(q);
+        
+        const html = `
+            <div class="section-wrapper">
+                <div class="table-container">
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">
+                                    <input type="checkbox" id="selectAllUsers" class="select-all">
+                                </th>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${snapshot.docs.map(doc => {
+                                const data = doc.data();
+                                return `
+                                    <tr data-userid="${doc.id}">
+                                        <td><input type="checkbox" class="user-checkbox" data-userid="${doc.id}"></td>
+                                        <td><input type="text" class="inline-edit name" value="${data.name || ''}" readonly></td>
+                                        <td><input type="tel" class="inline-edit phone" value="${data.phone || ''}" readonly></td>
+                                        <td><input type="email" class="inline-edit email" value="${data.email || ''}" readonly></td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="action-btn edit-user-btn" onclick="window.toggleEdit(this)">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="action-btn save-user-btn" onclick="window.saveChanges(this)" style="display: none;">
+                                                    <i class="fas fa-save"></i>
+                                                </button>
+                                                <button class="action-btn delete-user-btn" onclick="window.deleteUser('${doc.id}')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="bulk-actions">
+                    <button id="deleteSelectedUsers" class="danger-btn" style="display: none;">Delete Selected Users</button>
+                </div>
+            </div>
+        `;
+
+        usersList.innerHTML = html;
+        initCheckboxHandlers('user');
+        
+        // Add bulk delete handler
+        const deleteSelectedBtn = document.getElementById('deleteSelectedUsers');
+        if (deleteSelectedBtn) {
+            // Remove any existing event listeners
+            const newDeleteBtn = deleteSelectedBtn.cloneNode(true);
+            deleteSelectedBtn.parentNode.replaceChild(newDeleteBtn, deleteSelectedBtn);
+            
+            newDeleteBtn.addEventListener('click', async () => {
+                const selectedUsers = Array.from(document.querySelectorAll('.user-checkbox:checked'))
+                    .map(checkbox => checkbox.dataset.userid);
+                
+                if (selectedUsers.length === 0) {
+                    alert('Please select users to delete');
+                    return;
+                }
+
+                if (!confirm(`Are you sure you want to delete ${selectedUsers.length} selected users? This cannot be undone.`)) {
+                    return;
+                }
+
+                try {
+                    // Show loading state
+                    newDeleteBtn.disabled = true;
+                    newDeleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+
+                    // Delete users in sequence to avoid overwhelming the system
+                    for (const userId of selectedUsers) {
+                        await deleteUserAndAssociatedData(userId);
+                        // Remove row from UI
+                        const row = document.querySelector(`tr[data-userid="${userId}"]`);
+                        if (row) row.remove();
+                    }
+
+                    // Refresh the users lists
+                    await loadUsers();
+                    alert('Selected users deleted successfully');
+                } catch (error) {
+                    console.error('Error deleting users:', error);
+                    alert('Error deleting some users. Please try again.');
+                } finally {
+                    // Reset button state
+                    newDeleteBtn.disabled = false;
+                    newDeleteBtn.innerHTML = 'Delete Selected Users';
+                    updateDeleteButtonVisibility('user');
+                }
+            });
+        }
+        
+        // Initialize user search functionality
+        initUserSearch();
+    } catch (error) {
+        console.error('Error loading existing users:', error);
+        usersList.innerHTML = '<div class="error-message">Error loading users. Please try again.</div>';
+    }
+}
+
+// ...existing code...

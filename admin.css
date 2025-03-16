@@ -366,9 +366,9 @@ tr:hover {
 
 /* Users List Styles */
 .users-list {
-    margin-top: 2rem;
-    padding-top: 2rem;
-    border-top: 1px solid #ddd;
+    margin-top: 2.5rem;
+    padding-top: 1.8rem;
+    border-top: 1px solid var(--border-color);
     animation: fadeIn 0.4s ease-out;
 }
 
@@ -1870,5 +1870,293 @@ label {
     
     @page {
         margin: 1.5cm;
+    }
+}
+
+/* Search Input Styles */
+.search-container {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.8rem 2.5rem 0.8rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.search-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(57, 73, 171, 0.15);
+    outline: none;
+}
+
+.search-icon {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+}
+
+/* Searchable Select Styles */
+.searchable-select-container {
+    position: relative;
+    width: 100%;
+}
+
+.searchable-select {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--surface-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23596777' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+}
+
+/* Hide the search option since we show a search box instead */
+.searchable-select option[data-search] {
+    display: none;
+}
+
+/* Style for the search input inside dropdown */
+.select-search-input {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    z-index: 10;
+    margin: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Fix dropdown list style */
+.select-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 1000;
+    margin-top: 2px;
+}
+
+.select-dropdown.active {
+    display: block;
+}
+
+.select-option {
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.select-option:hover {
+    background-color: rgba(57, 73, 171, 0.08);
+}
+
+.select-option.selected {
+    background-color: rgba(57, 73, 171, 0.15);
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.select-option.filtered {
+    display: none;
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .select-search-input {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .select-dropdown {
+    background-color: var(--surface-color);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .select-option:hover {
+    background-color: var(--hover-bg);
+}
+
+/* Searchable Dropdown Styles - Replace existing searchable select styles */
+.searchable-dropdown-container {
+    position: relative;
+    width: 100%;
+}
+
+.searchable-dropdown {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--surface-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23596777' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.dropdown-menu.show {
+    display: block;
+}
+
+.search-box {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+    z-index: 2;
+}
+
+.search-box:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.dropdown-item {
+    padding: 0.8rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background-color: rgba(57, 73, 171, 0.08);
+}
+
+.dropdown-item.selected {
+    background-color: rgba(57, 73, 171, 0.15);
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+/* Dark mode adjustments for searchable dropdowns */
+[data-theme="dark"] .search-box {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .dropdown-menu {
+    background-color: var(--surface-color);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .dropdown-item:hover {
+    background-color: var(--hover-bg);
+}
+
+/* Search Input Styles - Improved positioning and styling */
+.search-container {
+    position: relative;
+    margin: 2rem 0;
+    max-width: 100%;
+}
+
+.search-input {
+    width: 100%;
+    padding: 1rem 1rem 1rem 3rem; /* Increased padding for all sides, especially left for icon */
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1.05rem; /* Slightly larger text for better readability */
+    line-height: 1.5;
+    transition: all 0.3s ease;
+    background-color: var(--surface-color);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08); /* More pronounced shadow */
+    height: 50px; /* Fixed height for better click target */
+    display: block; /* Ensure block display */
+}
+
+.search-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(57, 73, 171, 0.2); /* More visible focus state */
+    outline: none;
+}
+
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 1.1rem; /* Slightly larger icon */
+    pointer-events: none; /* Ensures clicks pass through to the input */
+}
+
+/* Improved users list spacing and structure */
+.users-list {
+    margin-top: 2.5rem;
+    padding-top: 1.8rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.users-list h3 {
+    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
+    color: var(--text-primary);
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .search-input {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .search-input::placeholder {
+    color: #999;
+}
+
+/* Mobile responsiveness for search */
+@media screen and (max-width: 768px) {
+    .search-container {
+        margin: 1.5rem 0;
+    }
+    
+    .search-input {
+        padding: 0.9rem 0.9rem 0.9rem 2.8rem;
+        font-size: 1rem;
+        height: 46px;
     }
 }

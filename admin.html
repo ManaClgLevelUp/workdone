@@ -69,16 +69,12 @@
 
                 <div class="users-list">
                     <h3>Existing Users</h3>
+                    <div class="search-container">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="userSearchInput" class="search-input" placeholder="Search users by name, email or phone...">
+                    </div>
                     <div class="users-table-container">
                         <table class="users-table">
-                            <!-- <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Phone</th>
-                                    <th>Email</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead> -->
                             <tbody id="usersList"></tbody>
                         </table>
                     </div>
@@ -90,10 +86,12 @@
                 <h2>Work Assignment</h2>
                 <div class="work-assign-container">
                     <div class="user-selection">
-                        <select id="selectUser">
-                            <option value="">Select User</option>
-                        </select>
-                        <input type="text" id="searchUser" placeholder="Search user">
+                        <div class="searchable-dropdown-container">
+                            <select id="selectUser" class="searchable-dropdown">
+                                <option value="">Select User</option>
+                                <!-- Options will be populated by JavaScript -->
+                            </select>
+                        </div>
                     </div>
 
                     <div class="work-type-selection">
@@ -122,9 +120,12 @@
             <section id="workProgress" class="section">
                 <h2>Work Progress</h2>
                 <div class="progress-filters">
-                    <select id="progressUser">
-                        <option value="">Select User</option>
-                    </select>
+                    <div class="searchable-dropdown-container">
+                        <select id="progressUser" class="searchable-dropdown">
+                            <option value="">Select User</option>
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
                     <select id="progressWorkType">
                         <option value="students">Registered Students</option>
                         <option value="sales">Sales Numbers</option>
