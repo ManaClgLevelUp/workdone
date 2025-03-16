@@ -1,26 +1,35 @@
-/* Add theme variables at the top */
+/* Premium theme variables */
 :root {
-    --primary-color: #4CAF50;
-    --secondary-color: #2196F3;
-    --accent-color: #FF9800;
-    --background-color: #f5f5f5;
+    --primary-color: #4a6aed; /* Rich royal blue */
+    --primary-dark: #3a56c5; /* Darker blue for hover states */
+    --secondary-color: #6039bb; /* Deep purple */
+    --accent-color: #e6b54a; /* Warm gold for accents */
+    --background-color: #f7f9fc; /* Very light blue-gray background */
     --surface-color: #ffffff;
-    --text-primary: #333333;
-    --text-secondary: #666666;
-    --border-color: #dddddd;
-    --card-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    --text-primary: #2c3e50;
+    --text-secondary: #596777;
+    --border-color: #e4e9f0;
+    --card-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    --success-color: #38b2ac; /* Teal */
+    --warning-color: #ed8936; /* Orange */
+    --error-color: #e53e3e; /* Red */
+    --animation-speed: 0.3s;
 }
 
 [data-theme="dark"] {
-    --primary-color: #66BB6A;
-    --secondary-color: #42A5F5;
-    --accent-color: #FFA726;
-    --background-color: #1a1a1a;
-    --surface-color: #2d2d2d;
-    --text-primary: #ecf0f1;
-    --text-secondary: #bdc3c7;
-    --border-color: #34495e;
-    --card-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    --primary-color: #5a78ff; /* Brighter blue for dark mode */
+    --primary-dark: #4a68df; /* Hover state for dark mode */
+    --secondary-color: #8659df; /* Lighter purple */
+    --accent-color: #f0c674; /* Brighter gold */
+    --background-color: #131a29; /* Deep blue-black */
+    --surface-color: #1c2433; /* Dark blue-gray surface */
+    --text-primary: #f0f4f8;
+    --text-secondary: #c9d1d9;
+    --border-color: #2d3748;
+    --card-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    --success-color: #4fd1c5; /* Brighter teal */
+    --warning-color: #f6ad55; /* Brighter orange */
+    --error-color: #fc8181; /* Brighter red */
 }
 
 /* Base Styles */
@@ -28,12 +37,15 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    transition: color var(--animation-speed), background-color var(--animation-speed), 
+                border-color var(--animation-speed), box-shadow var(--animation-speed);
 }
 
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: var(--background-color);
     color: var(--text-primary);
+    line-height: 1.6;
 }
 
 .dashboard {
@@ -42,11 +54,15 @@ body {
     flex-direction: column;
 }
 
-/* Header Styles */
+/* Header Styles - More premium look */
 header {
-    background-color: var(--primary-color);
+    background: linear-gradient(120deg, var(--primary-color), var(--secondary-color));
     color: white;
-    padding: 1rem;
+    padding: 1.25rem;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .user-info {
@@ -55,250 +71,414 @@ header {
     align-items: center;
 }
 
+#userName {
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    font-size: 1.2rem;
+}
+
 #logoutBtn {
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 1.25rem;
     background-color: transparent;
-    border: 1px solid white;
+    border: 2px solid rgba(255,255,255,0.8);
     color: white;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.25s ease;
+}
+
+#logoutBtn:hover {
+    background-color: rgba(255,255,255,0.15);
+    transform: translateY(-1px);
+}
+
+#logoutBtn:active {
+    transform: translateY(0px);
 }
 
 /* Content Styles */
 .content {
     flex: 1;
     padding: 2rem;
-    background-color: var(--surface-color);
+    background-color: var(--background-color);
 }
 
-/* Work Type Selector */
+/* Work Type Selector - More interactive */
 .work-type-selector {
     display: flex;
     gap: 1rem;
-    margin-bottom: 2rem;
+    margin-bottom: 2.5rem;
+    background: var(--surface-color);
+    padding: 0.75rem;
+    border-radius: 10px;
+    box-shadow: var(--card-shadow);
 }
 
 .type-btn {
     padding: 1rem 2rem;
     border: none;
-    background-color: #f0f0f0;
+    background-color: transparent;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 6px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    flex: 1;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.type-btn:hover {
+    color: var(--primary-color);
+}
+
+.type-btn::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 3px;
+    background-color: var(--primary-color);
+    transition: width 0.25s ease;
+}
+
+.type-btn:hover::after {
+    width: 50%;
 }
 
 .type-btn.active {
-    background-color: #4CAF50;
+    background-color: var(--primary-color);
     color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(74, 106, 237, 0.25);
 }
 
-/* Contact List Styles */
+.type-btn.active::after {
+    display: none;
+}
+
+/* Status filter with improved styling */
 .contact-filters {
-    margin-bottom: 1rem;
-}
-
-.contact-filters select {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-/* Table Styles */
-.contacts-table {
-    overflow-x: auto;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-th, td {
-    padding: 1rem;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-}
-
-th {
-    background-color: #f5f5f5;
-}
-
-/* Action Buttons */
-.action-btn {
-    padding: 0.5rem;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    margin: 0 0.25rem;
-}
-
-.call-btn {
-    background-color: #4CAF50;
-    color: white;
-}
-
-.whatsapp-btn {
-    background-color: #25D366;
-    color: white;
-}
-
-.note-btn {
-    background-color: #2196F3;
-    color: white;
-}
-
-/* Card Layout Styles */
-.contacts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 20px;
-    padding: 20px;
-}
-
-.contact-card {
-    background: var(--surface-color);
-    border-radius: 8px;
-    box-shadow: var(--card-shadow);
-    padding: 15px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    border: 1px solid var(--border-color);
-}
-
-.contact-info {
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
-}
-
-.contact-name {
-    font-size: 1.2em;
-    font-weight: bold;
-    margin-bottom: 5px;
-}
-
-.contact-phone {
-    color: #666;
-}
-
-.contact-actions {
-    display: flex;
-    gap: 10px;
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
-}
-
-.action-btn {
-    flex: 1;
-    padding: 8px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-}
-
-.call-btn {
-    background: #4CAF50;
-    color: white;
-}
-
-.whatsapp-btn {
-    background: #25D366;
-    color: white;
-}
-
-.contact-notes {
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
-}
-
-.notes-textarea {
-    width: 100%;
-    height: 60px;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    resize: none;
-    font-family: inherit;
-    font-size: 0.9em;
-    color: #666;
-    background-color: #f9f9f9;
-}
-
-.notes-textarea:focus {
-    outline: none;
-    border-color: #4CAF50;
-    background-color: #fff;
-}
-
-.contact-lastupdate {
-    font-size: 0.8em;
-    color: #999;
-    padding: 5px 0;
-}
-
-.contact-status select {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: #f9f9f9;
+    margin-bottom: 1.5rem;
 }
 
 .status-header-filter {
     width: 100%;
-    padding: 0.5rem;
-    border: none;
-    background-color: transparent;
-    color: inherit;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+    color: var(--text-primary);
     cursor: pointer;
-    font-weight: bold;
-    font-size: inherit;
+    font-weight: 500;
+    font-size: 0.95rem;
+    border-radius: 8px;
+    transition: all 0.25s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23596777' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
 }
 
 .status-header-filter:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .status-header-filter option {
     background-color: var(--surface-color);
     color: var(--text-primary);
-    padding: 8px;
+    padding: 12px;
 }
 
-/* Dark mode support */
-[data-theme="dark"] .status-header-filter {
-    background-color: var(--surface-color);
+/* Enhanced card layout styles */
+.contacts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px;
+    padding: 10px 5px;
+}
+
+.contact-card {
+    background: var(--surface-color);
+    border-radius: 12px;
+    box-shadow: var(--card-shadow);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    border: 1px solid var(--border-color);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.contact-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.contact-card:active {
+    transform: translateY(-2px);
+}
+
+/* Status indicator dot */
+.contact-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background-color: var(--primary-color);
+    opacity: 0.8;
+}
+
+.contact-card[data-status="answered"]::before {
+    background-color: var(--success-color);
+}
+
+.contact-card[data-status="notAnswered"]::before {
+    background-color: var(--warning-color);
+}
+
+.contact-card[data-status="notInterested"]::before {
+    background-color: var(--error-color);
+}
+
+.contact-info {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 16px;
+}
+
+.contact-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 8px;
     color: var(--text-primary);
 }
 
-[data-theme="dark"] .status-header-filter option {
-    background-color: var(--surface-color);
-    color: var(--text-primary);
+.contact-phone {
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.95rem;
 }
 
-.theme-toggle {
-    padding: 0.5rem;
-    background: transparent;
-    border: 1px solid var(--header-text);
-    color: var(--header-text);
-    border-radius: 50%;
+.contact-phone::before {
+    content: '\f095'; /* Phone icon (requires Font Awesome) */
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    font-size: 0.85rem;
+    opacity: 0.7;
+}
+
+/* Enhanced action buttons */
+.contact-actions {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.action-btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
     cursor: pointer;
-    width: 40px;
-    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s ease;
+    gap: 8px;
+    font-weight: 500;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.action-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 120%;
+    height: 120%;
+    background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 60%);
+    transform: translate(-50%, -50%) scale(0);
+    border-radius: 50%;
+    opacity: 0;
+    transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
+.action-btn:active::after {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+    transition: 0s;
+}
+
+.call-btn {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+}
+
+.call-btn:hover {
+    box-shadow: 0 4px 12px rgba(74, 106, 237, 0.3);
+    transform: translateY(-2px);
+}
+
+.whatsapp-btn {
+    background: linear-gradient(135deg, #25D366, #128C7E);
+    color: white;
+}
+
+.whatsapp-btn:hover {
+    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+    transform: translateY(-2px);
+}
+
+/* Enhanced notes section */
+.contact-notes {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+}
+
+.notes-textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    resize: none;
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background-color: var(--surface-color);
+    transition: all 0.25s ease;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.notes-textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(74, 106, 237, 0.15);
+}
+
+.notes-textarea::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.notes-textarea[readonly="true"] {
+    background-color: rgba(0,0,0,0.02);
+    cursor: pointer;
+}
+
+.notes-textarea[readonly="true"]:hover {
+    background-color: rgba(0,0,0,0.04);
+}
+
+/* Edit indicator */
+.contact-notes::after {
+    content: '\f044'; /* Edit icon (requires Font Awesome) */
+    font-family: 'Font Awesome 5 Free';
+    position: absolute;
+    bottom: 15px;
+    right: 10px;
+    color: var(--text-secondary);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    font-weight: 900;
+    font-size: 0.9rem;
+}
+
+.contact-notes:hover::after {
+    opacity: 0.6;
+}
+
+/* Last update with better styling */
+.contact-lastupdate {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.contact-lastupdate::before {
+    content: '\f017'; /* Clock icon (requires Font Awesome) */
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    opacity: 0.7;
+}
+
+/* Enhanced status selector */
+.contact-status select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--surface-color);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.95rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23596777' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.contact-status select:hover {
+    border-color: var(--primary-color);
+}
+
+.contact-status select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(74, 106, 237, 0.15);
+}
+
+/* Theme toggle with better styling */
+.theme-toggle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background-color: rgba(255,255,255,0.15);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s ease;
+    font-size: 1.1rem;
+    margin-right: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
 .theme-toggle:hover {
-    background: rgba(255,255,255,0.1);
+    background-color: rgba(255,255,255,0.25);
+    transform: rotate(30deg);
 }
 
-/* Mobile Responsive Styles */
+.theme-toggle:active {
+    transform: scale(0.9) rotate(30deg);
+}
+
+/* Mobile optimizations */
 @media screen and (max-width: 768px) {
     .content {
         padding: 1rem;
@@ -361,24 +541,39 @@ th {
         font-size: 16px; /* Prevent iOS zoom */
     }
 
-    /* Add pull-to-refresh indicator */
+    /* Add pull-to-refresh indicator with animation */
     .contacts-grid {
         position: relative;
     }
 
     .refresh-indicator {
-        text-align: center;
-        padding: 20px;
-        color: #666;
-        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        transform: translateY(-100%);
+        transition: transform 0.3s ease;
     }
 
     .refreshing .refresh-indicator {
-        display: block;
+        transform: translateY(0);
+        animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+        0% { opacity: 0.6; }
+        50% { opacity: 1; }
+        100% { opacity: 0.6; }
     }
 }
 
-/* Add dark mode specific styles */
+/* Dark mode refinements */
 [data-theme="dark"] input,
 [data-theme="dark"] select,
 [data-theme="dark"] textarea {
@@ -423,4 +618,44 @@ th {
 [data-theme="dark"] .notes-textarea {
     background-color: #2a2a2a;
     color: #e0e0e0;
+}
+
+/* Additional animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.contact-card {
+    animation: fadeIn 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+/* Staggered animation for cards */
+.contact-card:nth-child(1) { animation-delay: 0.05s; }
+.contact-card:nth-child(2) { animation-delay: 0.1s; }
+.contact-card:nth-child(3) { animation-delay: 0.15s; }
+.contact-card:nth-child(4) { animation-delay: 0.2s; }
+.contact-card:nth-child(5) { animation-delay: 0.25s; }
+.contact-card:nth-child(n+6) { animation-delay: 0.3s; }
+
+/* Empty state styling */
+.no-contacts {
+    text-align: center;
+    padding: 3rem;
+    background-color: var(--surface-color);
+    border-radius: 12px;
+    color: var(--text-secondary);
+    box-shadow: var(--card-shadow);
+    font-size: 1.1rem;
+}
+
+.no-contacts::before {
+    content: '\f119'; /* Sad face icon (requires Font Awesome) */
+    font-family: 'Font Awesome 5 Free';
+    display: block;
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+    font-weight: 900;
 }

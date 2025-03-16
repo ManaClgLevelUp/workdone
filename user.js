@@ -296,18 +296,56 @@ function formatPhoneNumber(phone) {
     return phone; // Return original if format is unknown
 }
 
-// Update the loadContacts function with work type specific filters
+// Modify the window.updateStatus function to directly update the UI
+window.updateStatus = async (contactId, newStatus) => {
+    try {
+        const contactCard = document.querySelector(`.contact-card[data-id="${contactId}"]`);
+        if (!contactCard) return;
+        
+        // Update Firestore document
+        await updateDoc(doc(db, 'contacts', contactId), {
+            status: newStatus,
+            lastUpdated: serverTimestamp()
+        });
+
+        // Update the "Last updated" text in the UI directly
+        const lastUpdateEl = contactCard.querySelector('.contact-lastupdate');
+        if (lastUpdateEl) {
+            lastUpdateEl.textContent = 'Last updated: just now';
+        }
+        
+        // Apply the appropriate status class for visual indication
+        contactCard.setAttribute('data-status', newStatus);
+        
+        // Refresh the status counts without reloading all contacts
+        const activeWorkType = document.querySelector('.type-btn.active').dataset.type;
+        await updateStatusFilterCounts(currentUser.uid, activeWorkType);
+
+    } catch (error) {
+        console.error('Error updating status:', error);
+        alert('Error updating status: ' + error.message);
+    }
+};
+
+// Modify loadContacts function to use a different approach
 async function loadContacts(workType) {
     if (!currentUser) return;
 
-    let baseQuery = query(
-        collection(db, 'contacts'),
-        where('assignedTo', '==', currentUser.uid),
-        where('workType', '==', workType)
-    );
+    // Show a loading indicator
+    contactsData.innerHTML = '<div class="loading-indicator"><i class="fas fa-spinner fa-spin"></i> Loading contacts...</div>';
 
-    const unsubscribe = onSnapshot(baseQuery, async (snapshot) => {
-        // Calculate counts
+    try {
+        // First, get the contacts initially without a listener
+        const contactsRef = collection(db, 'contacts');
+        const q = query(
+            contactsRef,
+            where('assignedTo', '==', currentUser.uid),
+            where('workType', '==', workType)
+        );
+        
+        const snapshot = await getDocs(q);
+        
+        // Calculate counts for filter
         const counts = {
             notCalled: 0,
             answered: 0,
@@ -324,84 +362,144 @@ async function loadContacts(workType) {
         });
 
         // Update filter dropdown
-        const filterContainer = document.querySelector('.status-filter-container');
-        if (filterContainer) {
-            const baseOptions = `
-                <option value="">All Status (${snapshot.docs.length})</option>
-                <option value="notCalled">Not Called (${counts.notCalled})</option>
-                <option value="answered">Answered (${counts.answered})</option>
-                <option value="notAnswered">Not Answered (${counts.notAnswered})</option>
-                <option value="notInterested">Not Interested (${counts.notInterested})</option>
-            `;
-
-            const salesOptions = workType === 'sales' ? `
-                <option value="callLater">Call Later (${counts.callLater})</option>
-                <option value="alreadyInCourse">Already in Course (${counts.alreadyInCourse})</option>
-            ` : '';
-
-            filterContainer.innerHTML = `
-                <select id="statusHeaderFilter" class="status-header-filter">
-                    ${baseOptions}
-                    ${salesOptions}
-                </select>
-            `;
-
-            // Add filter change handler
-            const statusFilter = document.getElementById('statusHeaderFilter');
-            if (statusFilter) {
-                // Remove any existing listeners
-                const newFilter = statusFilter.cloneNode(true);
-                statusFilter.parentNode.replaceChild(newFilter, statusFilter);
-                
-                newFilter.addEventListener('change', () => {
-                    const selectedStatus = newFilter.value;
-                    const filteredDocs = selectedStatus ? 
-                        snapshot.docs.filter(doc => doc.data().status === selectedStatus) :
-                        snapshot.docs;
-                        
-                    // Update display with filtered contacts
-                    renderContacts(filteredDocs, workType);
-                });
-            }
-        }
-
-        // Initial render with all contacts
+        updateFilterDropdown(counts, snapshot.docs.length, workType);
+        
+        // Render contacts
         renderContacts(snapshot.docs, workType);
-    });
+        
+        // Set up a limited listener that only updates when contacts are added or removed
+        // but not when individual contacts are updated
+        const unsubscribe = onSnapshot(
+            q, 
+            { includeMetadataChanges: true },
+            (updatedSnapshot) => {
+                // Only do a full refresh if the number of documents has changed
+                // This prevents re-renders on individual contact updates
+                if (updatedSnapshot.docChanges().some(change => 
+                    change.type === 'added' || change.type === 'removed')) {
+                    
+                    // Recalculate counts and update UI
+                    const newCounts = calculateCounts(updatedSnapshot.docs);
+                    updateFilterDropdown(newCounts, updatedSnapshot.docs.length, workType);
+                    renderContacts(updatedSnapshot.docs, workType);
+                }
+            },
+            (error) => {
+                console.error("Snapshot error:", error);
+                contactsData.innerHTML = '<div class="error-message">Error loading contacts. Please try again later.</div>';
+            }
+        );
 
-    if (window.currentUnsubscribe) {
-        window.currentUnsubscribe();
+        if (window.currentUnsubscribe) {
+            window.currentUnsubscribe();
+        }
+        window.currentUnsubscribe = unsubscribe;
+        
+    } catch (error) {
+        console.error("Error loading contacts:", error);
+        contactsData.innerHTML = '<div class="error-message">Error loading contacts. Please try again later.</div>';
     }
-    window.currentUnsubscribe = unsubscribe;
 }
 
-// Add new helper function to render contacts
+// Helper function to calculate counts
+function calculateCounts(docs) {
+    const counts = {
+        notCalled: 0,
+        answered: 0,
+        notAnswered: 0,
+        notInterested: 0,
+        callLater: 0,
+        alreadyInCourse: 0
+    };
+    
+    docs.forEach(doc => {
+        const status = doc.data().status || 'notCalled';
+        counts[status] = (counts[status] || 0) + 1;
+    });
+    
+    return counts;
+}
+
+// Helper function to update the filter dropdown
+function updateFilterDropdown(counts, totalCount, workType) {
+    const filterContainer = document.querySelector('.status-filter-container');
+    if (filterContainer) {
+        const baseOptions = `
+            <option value="">All Status (${totalCount})</option>
+            <option value="notCalled">Not Called (${counts.notCalled})</option>
+            <option value="answered">Answered (${counts.answered})</option>
+            <option value="notAnswered">Not Answered (${counts.notAnswered})</option>
+            <option value="notInterested">Not Interested (${counts.notInterested})</option>
+        `;
+
+        const salesOptions = workType === 'sales' ? `
+            <option value="callLater">Call Later (${counts.callLater})</option>
+            <option value="alreadyInCourse">Already in Course (${counts.alreadyInCourse})</option>
+        ` : '';
+
+        filterContainer.innerHTML = `
+            <select id="statusHeaderFilter" class="status-header-filter">
+                ${baseOptions}
+                ${salesOptions}
+            </select>
+        `;
+
+        // Add filter change handler
+        const statusFilter = document.getElementById('statusHeaderFilter');
+        if (statusFilter) {
+            // Remove any existing listeners
+            const newFilter = statusFilter.cloneNode(true);
+            statusFilter.parentNode.replaceChild(newFilter, statusFilter);
+            
+            newFilter.addEventListener('change', () => {
+                const selectedStatus = newFilter.value;
+                
+                // Get all contact cards
+                const cards = document.querySelectorAll('.contact-card');
+                
+                if (selectedStatus === '') {
+                    // Show all cards if no filter is selected
+                    cards.forEach(card => card.style.display = 'flex');
+                } else {
+                    // Filter cards by status
+                    cards.forEach(card => {
+                        const cardStatus = card.getAttribute('data-status');
+                        card.style.display = (cardStatus === selectedStatus) ? 'flex' : 'none';
+                    });
+                }
+            });
+        }
+    }
+}
+
+// Update renderContacts to include data-status attribute
 function renderContacts(docs, workType) {
     const html = docs.map(doc => {
         const data = doc.data();
         const formattedPhone = formatPhoneNumber(data.phone);
+        const status = data.status || 'notCalled';
         
         // Generate status options based on work type
         const statusOptions = workType === 'sales' ? `
             <select onchange="window.updateStatus('${doc.id}', this.value)">
-                <option value="notCalled" ${data.status === 'notCalled' ? 'selected' : ''}>Not Called</option>
-                <option value="answered" ${data.status === 'answered' ? 'selected' : ''}>Answered</option>
-                <option value="notAnswered" ${data.status === 'notAnswered' ? 'selected' : ''}>Not Answered</option>
-                <option value="notInterested" ${data.status === 'notInterested' ? 'selected' : ''}>Not Interested</option>
-                <option value="callLater" ${data.status === 'callLater' ? 'selected' : ''}>Call Later</option>
-                <option value="alreadyInCourse" ${data.status === 'alreadyInCourse' ? 'selected' : ''}>Already in Course</option>
+                <option value="notCalled" ${status === 'notCalled' ? 'selected' : ''}>Not Called</option>
+                <option value="answered" ${status === 'answered' ? 'selected' : ''}>Answered</option>
+                <option value="notAnswered" ${status === 'notAnswered' ? 'selected' : ''}>Not Answered</option>
+                <option value="notInterested" ${status === 'notInterested' ? 'selected' : ''}>Not Interested</option>
+                <option value="callLater" ${status === 'callLater' ? 'selected' : ''}>Call Later</option>
+                <option value="alreadyInCourse" ${status === 'alreadyInCourse' ? 'selected' : ''}>Already in Course</option>
             </select>
         ` : `
             <select onchange="window.updateStatus('${doc.id}', this.value)">
-                <option value="notCalled" ${data.status === 'notCalled' ? 'selected' : ''}>Not Called</option>
-                <option value="answered" ${data.status === 'answered' ? 'selected' : ''}>Answered</option>
-                <option value="notAnswered" ${data.status === 'notAnswered' ? 'selected' : ''}>Not Answered</option>
-                <option value="notInterested" ${data.status === 'notInterested' ? 'selected' : ''}>Not Interested</option>
+                <option value="notCalled" ${status === 'notCalled' ? 'selected' : ''}>Not Called</option>
+                <option value="answered" ${status === 'answered' ? 'selected' : ''}>Answered</option>
+                <option value="notAnswered" ${status === 'notAnswered' ? 'selected' : ''}>Not Answered</option>
+                <option value="notInterested" ${status === 'notInterested' ? 'selected' : ''}>Not Interested</option>
             </select>
         `;
 
         return `
-            <div class="contact-card" data-id="${doc.id}">
+            <div class="contact-card" data-id="${doc.id}" data-status="${status}">
                 <div class="contact-info">
                     <div class="contact-name">${data.name}</div>
                     <div class="contact-phone">${formattedPhone}</div>
@@ -634,3 +732,34 @@ window.sendWhatsApp = async (contactId, phone) => {
         lastUpdated: serverTimestamp()
     });
 };
+
+// Add loading indicator styles
+const style = document.createElement('style');
+style.textContent = `
+    .loading-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+        background: var(--surface-color);
+        border-radius: 8px;
+        box-shadow: var(--card-shadow);
+    }
+    
+    .loading-indicator i {
+        margin-right: 10px;
+        font-size: 1.5rem;
+    }
+    
+    .error-message {
+        padding: 2rem;
+        color: var(--error-color);
+        background: var(--surface-color);
+        border-radius: 8px;
+        box-shadow: var(--card-shadow);
+        text-align: center;
+    }
+`;
+document.head.appendChild(style);
