@@ -6,6 +6,8 @@
     <title>User Dashboard</title>
     <link rel="stylesheet" href="user.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Add auth protection -->
+    <script type="module" src="auth.js"></script>
 </head>
 <body>
     <div class="dashboard">
@@ -31,13 +33,10 @@
 
             <div class="contact-list">
                 <div class="contact-filters">
-                    <select id="statusHeaderFilter" class="status-header-filter">
-                        <option value="">All Status</option>
-                        <option value="notCalled">Not Called (0)</option>
-                        <option value="answered">Answered (0)</option>
-                        <option value="notAnswered">Not Answered (0)</option>
-                        <option value="notInterested">Not Interested (0)</option>
-                    </select>
+                    <!-- Empty select that will be populated dynamically -->
+                    <div class="status-filter-container">
+                        <select id="statusHeaderFilter" class="status-header-filter"></select>
+                    </div>
                 </div>
 
                 <div class="contacts-grid" id="contactsData"></div>

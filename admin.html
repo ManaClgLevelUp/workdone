@@ -6,6 +6,8 @@
     <title>Admin Dashboard</title>
     <link rel="stylesheet" href="admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Add auth protection -->
+    <script type="module" src="auth.js"></script>
 </head>
 <body>
     <div class="dashboard">
@@ -69,14 +71,14 @@
                     <h3>Existing Users</h3>
                     <div class="users-table-container">
                         <table class="users-table">
-                            <thead>
+                            <!-- <thead>
                                 <tr>
                                     <th>Name</th>
                                     <th>Phone</th>
                                     <th>Email</th>
                                     <th>Actions</th>
                                 </tr>
-                            </thead>
+                            </thead> -->
                             <tbody id="usersList"></tbody>
                         </table>
                     </div>
@@ -142,7 +144,7 @@
                     <div id="userProgressSection" class="progress-section active">
                         <div class="progress-table">
                             <table>
-                                <thead>
+                                <!-- <thead>
                                     <tr>
                                         <th>Contact Details</th>
                                         <th>Actions</th>
@@ -159,7 +161,7 @@
                                         <th>Last Updated</th>
                                         <th>Manage</th>
                                     </tr>
-                                </thead>
+                                </thead> -->
                                 <tbody id="progressData"></tbody>
                             </table>
                         </div>
