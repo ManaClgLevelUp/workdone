@@ -3,42 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Login | Work Done</title>
+    <link rel="stylesheet" href="login.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <!-- No auth check on login page -->
+    <style>
+        /* Loading button styles */
+        .login-btn.loading {
+            position: relative;
+            color: transparent;
+            pointer-events: none;
+        }
+        
+        .login-btn.loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            margin: -10px 0 0 -10px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <div class="login-container">
-            <h1>Welcome to Work Done</h1>
-            <p class="subtitle">"Complete your Work Instantly"</p>
-            
-            <div class="role-selector">
-                <button class="role-btn active" data-role="admin">Admin</button>
-                <button class="role-btn" data-role="user">User</button>
-            </div>
-
-            <form id="loginForm" class="login-form">
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" placeholder="Enter your Email" required>
+        <div class="login-wrapper">
+            <div class="login-container">
+                <div class="login-header">
+                    <h1>Welcome to Work Done</h1>
+                    <p class="subtitle">"Complete your Work Instantly"</p>
                 </div>
                 
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <div class="password-input">
-                        <input type="password" id="password" placeholder="Enter your Password" required>
-                        <button type="button" class="toggle-password">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
+                <div class="role-selector">
+                    <button class="role-btn" data-role="admin">Admin</button>
+                    <button class="role-btn active" data-role="user">User</button>
                 </div>
 
-                <button type="submit" class="login-btn">Login</button>
-            </form>
+                <form id="loginForm" class="login-form">
+                    <div class="form-group">
+                        <label for="email">
+                            <i class="fas fa-envelope"></i>
+                            <span>Email</span>
+                        </label>
+                        <input type="email" id="email" placeholder="Enter your Email" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">
+                            <i class="fas fa-lock"></i>
+                            <span>Password</span>
+                        </label>
+                        <div class="password-input">
+                            <input type="password" id="password" placeholder="Enter your Password" required>
+                            <button type="button" class="toggle-password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="login-btn">
+                        <span>Login</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
     
     <script type="module" src="script.js"></script>
+    <script>
+        // Add loading animation to login button
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            const loginBtn = document.querySelector('.login-btn');
+            loginBtn.classList.add('loading');
+            // Form will continue submitting normally
+        });
+        
+        // Add toggle password visibility
+        document.querySelector('.toggle-password').addEventListener('click', function() {
+            const passwordInput = document.getElementById('password');
+            const icon = this.querySelector('i');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        });
+    </script>
 </body>
 </html>
