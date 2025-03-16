@@ -934,6 +934,10 @@ function cleanupListeners() {
     }
 }
 
+// Remove or comment out old scroll-based listeners:
+contactsGrid.removeEventListener('scroll', handleScrollReload);
+// or remove entire lines if any were directly binding scroll events
+
 // Replace the touchmove and touchend event listeners with versions that don't react to normal scrolling
 contactsGrid.removeEventListener('touchmove', contactsGrid._touchmoveListener);
 contactsGrid.removeEventListener('touchend', contactsGrid._touchendListener);
