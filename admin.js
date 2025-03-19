@@ -419,22 +419,38 @@ function showContactPreview(contacts) {
             </div>
         `;
 
-        // Create one-time event handlers
+        document.body.appendChild(previewDialog);
+
+        // Create one-time event handlers that properly clean up
+        const confirmBtn = previewDialog.querySelector('.confirm-btn');
+        const cancelBtn = previewDialog.querySelector('.cancel-btn');
+
         const handleConfirm = () => {
+            confirmBtn.removeEventListener('click', handleConfirm);
+            cancelBtn.removeEventListener('click', handleCancel);
             previewDialog.remove();
             resolve(true);
         };
 
         const handleCancel = () => {
+            confirmBtn.removeEventListener('click', handleConfirm);
+            cancelBtn.removeEventListener('click', handleCancel);
             previewDialog.remove();
             resolve(false);
         };
 
-        document.body.appendChild(previewDialog);
-
-        // Add event listeners with { once: true }
-        previewDialog.querySelector('.confirm-btn').addEventListener('click', handleConfirm, { once: true });
-        previewDialog.querySelector('.cancel-btn').addEventListener('click', handleCancel, { once: true });
+        // Add event listeners
+        confirmBtn.addEventListener('click', handleConfirm);
+        cancelBtn.addEventListener('click', handleCancel);
+        
+        // Also handle Escape key to cancel
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                document.removeEventListener('keydown', handleEscape);
+                handleCancel();
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
     });
 }
 
@@ -470,190 +486,124 @@ addSingleContact.addEventListener('click', async () => {
     }
 });
 
-// Update bulk contacts addition with preview
-addBulkContacts.addEventListener('click', async () => {
-    if (!selectUser.value || !bulkContacts.value) {
-        alert('Please select user and enter contacts');
-        return;
-    }
-
-    const contacts = bulkContacts.value.split('\n')
-        .map(line => {
-            const parts = line.includes(':') ? line.split(':') : line.split('\t');
-            const [name, phone] = parts.map(item => item.trim());
-            return name && phone ? { name, phone: formatPhoneNumber(phone) } : null;
-        })
-        .filter(contact => contact !== null);
-
-    if (contacts.length === 0) {
-        alert('No valid contacts found');
-        return;
-    }
-
-    const confirmed = await showContactPreview(contacts);
-    if (!confirmed) return;
-
-    try {
-        const batch = writeBatch(db);
-
-        contacts.forEach(contact => {
-            const newDocRef = doc(collection(db, 'contacts'));
-            batch.set(newDocRef, {
-                ...contact,
-                assignedTo: selectUser.value,
-                workType: workType.value,
-                status: 'notCalled',
-                createdAt: serverTimestamp()
-            });
-        });
-
-        await batch.commit();
-        bulkContacts.value = '';
-        alert('Bulk contacts assigned successfully');
-    } catch (error) {
-        alert('Error assigning bulk contacts: ' + error.message);
-    }
-});
-
-// Load Users
-
-// Add inline editing functions to window object
-window.toggleEdit = (button) => {
-    const row = button.closest('tr');
-    const inputs = row.querySelectorAll('.inline-edit');
-    const saveBtn = row.querySelector('.save-user-btn');
-    const editBtn = row.querySelector('.edit-user-btn');
-
-    inputs.forEach(input => {
-        input.readOnly = !input.readOnly;
-        if (!input.readOnly) {
-            input.focus();
-        }
-    });
-
-    saveBtn.style.display = inputs[0].readOnly ? 'none' : 'inline-flex';
-    editBtn.style.display = inputs[0].readOnly ? 'inline-flex' : 'none';
-};
-
-window.saveChanges = async (button) => {
-    const row = button.closest('tr');
-    const userId = row.dataset.userid;
-    const nameInput = row.querySelector('.inline-edit.name');
-    const phoneInput = row.querySelector('.inline-edit.phone');
-    const emailInput = row.querySelector('.inline-edit.email');
-
-    try {
-        await updateDoc(doc(db, 'users', userId), {
-            name: nameInput.value,
-            phone: phoneInput.value,
-            email: emailInput.value,
-            lastUpdated: serverTimestamp()
-        });
-
-        window.toggleEdit(button); // Switch back to readonly mode
-        alert('User updated successfully');
-    } catch (error) {
-        alert('Error updating user: ' + error.message);
-    }
-};
-
-// Add user management functions
-window.editUser = async (userId) => {
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    const userData = userDoc.data();
-
-    const newName = prompt('Enter new name:', userData.name);
-    const newPhone = prompt('Enter new phone:', userData.phone);
-    const newEmail = prompt('Enter new email:', userData.email);
-
-    if (newName && newPhone && newEmail) {
-        try {
-            await updateDoc(doc(db, 'users', userId), {
-                name: newName,
-                phone: newPhone,
-                email: newEmail,
-                lastUpdated: serverTimestamp()
-            });
-            loadExistingUsers(); // Refresh the list
-        } catch (error) {
-            alert('Error updating user: ' + error.message);
-        }
-    }
-};
-
-// Helper function to format phone number
+// Improve the formatPhoneNumber function to be more robust
 function formatPhoneNumber(phone) {
-    // Remove any non-digit characters
+    if (!phone) return '';
+    
+    // Remove all non-digit characters
     let cleaned = phone.replace(/\D/g, '');
-    // Add +91 if not present and number is 10 digits
+    
+    // Check for valid phone number length
     if (cleaned.length === 10) {
+        // 10 digits - add country code
         return `+91${cleaned}`;
+    } else if (cleaned.length === 12 && cleaned.startsWith('91')) {
+        // Already has 91 prefix
+        return `+${cleaned}`;
+    } else if (cleaned.length > 10) {
+        // Try to extract the last 10 digits
+        const last10 = cleaned.slice(-10);
+        if (last10.length === 10) {
+            return `+91${last10}`;
+        }
     }
-    // If number already has country code
-    if (cleaned.length === 12 && cleaned.startsWith('91')) {
+    
+    // Return with + prefix if it's at least 10 digits
+    if (cleaned.length >= 10) {
         return `+${cleaned}`;
     }
-    return phone; // Return original if format is unknown
+    
+    return phone; // Return original if we can't format it
 }
 
-// Work Assignment Handlers
-addSingleContact.addEventListener('click', async () => {
-    if (!selectUser.value || !contactName.value || !contactPhone.value) {
-        alert('Please fill all fields');
-        return;
-    }
-
-    const contact = {
-        name: contactName.value,
-        phone: formatPhoneNumber(contactPhone.value)
-    };
-
-    const confirmed = await showContactPreview([contact]);
-    if (!confirmed) return;
-
-    try {
-        await addDoc(collection(db, 'contacts'), {
-            ...contact,
-            assignedTo: selectUser.value,
-            workType: workType.value,
-            status: 'notCalled',
-            createdAt: serverTimestamp()
-        });
-
-        contactName.value = '';
-        contactPhone.value = '';
-        alert('Contact assigned successfully');
-    } catch (error) {
-        alert('Error assigning contact: ' + error.message);
-    }
-});
-
+// Enhance the addBulkContacts click handler
 addBulkContacts.addEventListener('click', async () => {
     if (!selectUser.value || !bulkContacts.value) {
         alert('Please select user and enter contacts');
         return;
     }
 
-    const contacts = bulkContacts.value.split('\n')
-        .map(line => {
-            const parts = line.includes(':') ? line.split(':') : line.split('\t');
-            const [name, phone] = parts.map(item => item.trim());
-            return name && phone ? { name, phone: formatPhoneNumber(phone) } : null;
-        })
-        .filter(contact => contact !== null);
+    // Enhanced parsing with better error handling
+    const lines = bulkContacts.value.trim().split('\n');
+    const validContacts = [];
+    const invalidLines = [];
+    
+    lines.forEach((line, index) => {
+        // Skip empty lines
+        if (!line.trim()) return;
+        
+        // Try multiple delimiters: colon, tab, comma, or space
+        let parts;
+        if (line.includes(':')) {
+            parts = line.split(':');
+        } else if (line.includes('\t')) {
+            parts = line.split('\t');
+        } else if (line.includes(',')) {
+            parts = line.split(',');
+        } else {
+            // If no delimiter found, try to split by the last space
+            const lastSpaceIndex = line.lastIndexOf(' ');
+            if (lastSpaceIndex > 0) {
+                parts = [
+                    line.substring(0, lastSpaceIndex),
+                    line.substring(lastSpaceIndex + 1)
+                ];
+            } else {
+                invalidLines.push(`Line ${index + 1}: "${line}" (No valid delimiter found)`);
+                return;
+            }
+        }
+        
+        // Clean up parts and validate
+        let name = parts[0]?.trim();
+        let phone = parts[1]?.trim();
+        
+        if (!name || !phone) {
+            invalidLines.push(`Line ${index + 1}: "${line}" (Missing name or phone)`);
+            return;
+        }
+        
+        // Check if phone has at least some digits
+        if (!/\d/.test(phone)) {
+            invalidLines.push(`Line ${index + 1}: "${line}" (Phone number contains no digits)`);
+            return;
+        }
+        
+        // Format phone number
+        const formattedPhone = formatPhoneNumber(phone);
+        validContacts.push({ name, phone: formattedPhone });
+    });
 
-    if (contacts.length === 0) {
-        alert('No valid contacts found');
+    if (validContacts.length === 0) {
+        if (invalidLines.length > 0) {
+            alert(`No valid contacts found. Please check the following lines:\n\n${invalidLines.join('\n')}`);
+        } else {
+            alert('No valid contacts found');
+        }
         return;
     }
 
-    const confirmed = await showContactPreview(contacts);
-    if (!confirmed) return;
+    // Show a summary of results
+    if (invalidLines.length > 0) {
+        if (!confirm(`Found ${validContacts.length} valid contacts, but ${invalidLines.length} invalid lines.\n\nDo you want to continue with the valid contacts only?`)) {
+            return;
+        }
+    }
 
+    // Show preview and GET EXPLICIT CONFIRMATION RESULT
+    const confirmed = await showContactPreview(validContacts);
+    
+    // If not confirmed, exit the function immediately
+    if (!confirmed) {
+        console.log("Contact addition cancelled by user");
+        return;  // This ensures we don't proceed if user cancels
+    }
+
+    // Only proceed with batch commit if user confirmed
     try {
         const batch = writeBatch(db);
 
-        contacts.forEach(contact => {
+        validContacts.forEach(contact => {
             const newDocRef = doc(collection(db, 'contacts'));
             batch.set(newDocRef, {
                 ...contact,
@@ -666,7 +616,7 @@ addBulkContacts.addEventListener('click', async () => {
 
         await batch.commit();
         bulkContacts.value = '';
-        alert('Bulk contacts assigned successfully');
+        alert(`Successfully added ${validContacts.length} contacts`);
     } catch (error) {
         alert('Error assigning bulk contacts: ' + error.message);
     }
